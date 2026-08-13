@@ -16,6 +16,7 @@ import {
   Sparkles,
   LogOut,
   User,
+  CalendarDays,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,11 @@ const navItems = [
     label: "Chat",
     href: "/dashboard/chat",
     icon: MessageSquare,
+  },
+  {
+    label: "Calendar",
+    href: "/dashboard/calendar",
+    icon: CalendarDays,
   },
   {
     label: "Flashcards",

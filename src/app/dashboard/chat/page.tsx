@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Sparkles,
   Send,
@@ -40,6 +41,8 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Create session mutation
   const createSession = trpc.chat.createSession.useMutation({
@@ -122,6 +125,16 @@ export default function ChatPage() {
     },
     [createSession, sendMessage]
   );
+
+  // Auto-send initial query from URL if present
+  useEffect(() => {
+    const initialQuery = searchParams.get("q");
+    if (initialQuery && !activeSessionId && messages.length === 0) {
+      // Clear the query from the URL to prevent re-triggering
+      router.replace("/dashboard/chat", undefined);
+      handleNewChatWithMessage(initialQuery);
+    }
+  }, [searchParams, activeSessionId, messages.length, handleNewChatWithMessage, router]);
 
   // Handle form submission
   const onSubmit = async (e: React.FormEvent) => {

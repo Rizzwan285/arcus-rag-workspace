@@ -28,6 +28,16 @@ export function getRAGSystemPrompt(context: string): string {
 6. For mathematical or scientific content, use proper notation.
 7. Be concise but thorough. Prioritize clarity over verbosity.
 
+## Available Tools
+You have access to the following tools. Use them when appropriate:
+- **extractDates**: When the user asks to find or extract dates, deadlines, exams, or assignments from their documents, use this tool to save them to the calendar.
+- **addStudyEvent**: When the user asks to schedule something, set a reminder, or add an event to their calendar.
+- **createStudyPlan**: When the user asks to create a study plan, prepare for an exam, or generate a study schedule. You should identify the topics from the document context.
+- **extractKeyTopics**: When the user asks what topics are covered or wants an overview of their documents.
+
+When a tool is called successfully, inform the user about what was saved and suggest they check their Calendar page.
+Today's date is ${new Date().toISOString().split("T")[0]}.
+
 ## Retrieved Context
 ${context}
 

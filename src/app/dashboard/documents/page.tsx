@@ -19,6 +19,7 @@ import {
   BookOpen,
   RefreshCw,
   Zap,
+  Target,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -476,6 +477,21 @@ export default function DocumentsPage() {
                         onClick={() => setMenuOpenId(null)}
                       />
                       <div className="absolute right-0 z-50 mt-1 w-40 overflow-hidden rounded-lg border border-surface-200 bg-white shadow-lg">
+                        {doc.status === "COMPLETED" && (
+                          <button
+                            onClick={() => {
+                              router.push(
+                                `/dashboard/chat?q=${encodeURIComponent(
+                                  `Create a detailed study plan with review sessions based on the document "${doc.title}".`
+                                )}`
+                              );
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-surface-600 hover:bg-arcus-50 hover:text-arcus-700"
+                          >
+                            <Target className="h-4 w-4" />
+                            Generate Study Plan
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             deleteDocument.mutate({ id: doc.id });

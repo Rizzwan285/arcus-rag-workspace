@@ -30,6 +30,7 @@ import {
   getRAGSystemPrompt,
   formatChunksAsContext,
 } from "@/lib/langchain/prompts";
+import { createChatTools } from "@/lib/ai/tools";
 
 export const maxDuration = 60; // Allow up to 60s for LLM generation
 
@@ -118,11 +119,14 @@ export async function POST(req: Request) {
     // 5. Convert UI messages to model messages for the LLM
     const modelMessages = await convertToModelMessages(rawMessages);
 
-    // 6. Stream the response from Gemini
+    // 6. Stream the response from Gemini with tool calling
+    const chatTools = createChatTools(userId);
+
     const result = streamText({
       model: google("gemini-1.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
+      tools: chatTools,
       onFinish: async ({ text }) => {
         // 7. Save messages to database on completion
         if (sessionId) {
