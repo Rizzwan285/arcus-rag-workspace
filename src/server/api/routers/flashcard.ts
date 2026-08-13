@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 export const flashcardRouter = createTRPCRouter({
   // Get all decks for the user
   getDecks: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.flashcardDeck.findMany({
+    return ctx.prisma.flashcardDeck.findMany({
       where: {
         document: {
           userId: ctx.session.user.id,
@@ -27,7 +27,7 @@ export const flashcardRouter = createTRPCRouter({
   getDeckById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const deck = await ctx.db.flashcardDeck.findUnique({
+      const deck = await ctx.prisma.flashcardDeck.findUnique({
         where: { id: input.id },
         include: {
           cards: true,
@@ -52,7 +52,7 @@ export const flashcardRouter = createTRPCRouter({
   deleteDeck: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const deck = await ctx.db.flashcardDeck.findUnique({
+      const deck = await ctx.prisma.flashcardDeck.findUnique({
         where: { id: input.id },
         include: { document: { select: { userId: true } } },
       });
@@ -65,7 +65,7 @@ export const flashcardRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
-      await ctx.db.flashcardDeck.delete({
+      await ctx.prisma.flashcardDeck.delete({
         where: { id: input.id },
       });
 

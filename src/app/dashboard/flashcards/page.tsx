@@ -1,75 +1,106 @@
 "use client";
 
-import {
-  BookOpen,
-  Plus,
-  FileText,
-  ChevronRight,
-  Layers,
-  Sparkles,
-} from "lucide-react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { BookOpen, Layers, Trash2, ArrowRight, FileText, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
 
 export default function FlashcardsPage() {
+  const { data: session } = useSession();
+  
+  const { data: decks = [], isLoading, refetch } = trpc.flashcard.getDecks.useQuery(undefined, {
+    enabled: !!session?.user,
+  });
+
+  const deleteDeck = trpc.flashcard.deleteDeck.useMutation({
+    onSuccess: () => refetch(),
+  });
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-surface-900">
             Flashcards
           </h1>
           <p className="mt-1 text-surface-500">
-            AI-generated study cards from your documents
+            Review your AI-generated study decks
           </p>
         </div>
       </div>
 
-      {/* ── Empty State ── */}
-      <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50">
-          <BookOpen className="h-10 w-10 text-emerald-500" />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
         </div>
-        <h2 className="mb-2 text-xl font-bold text-surface-900">
-          No Flashcard Decks Yet
-        </h2>
-        <p className="mx-auto mb-8 max-w-sm text-sm text-surface-500">
-          Upload documents and generate flashcard decks to study key concepts
-          with spaced repetition.
-        </p>
-
-        {/* How it works */}
-        <div className="mx-auto max-w-lg rounded-xl border border-surface-200 bg-surface-50 p-6">
-          <h3 className="mb-4 text-sm font-semibold text-surface-700">
-            How It Works
+      ) : decks.length === 0 ? (
+        <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
+          <BookOpen className="mx-auto mb-4 h-12 w-12 text-surface-300" />
+          <h3 className="text-lg font-semibold text-surface-900">
+            No Flashcard Decks Yet
           </h3>
-          <div className="flex items-center justify-center gap-4">
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                <FileText className="h-5 w-5 text-blue-500" />
-              </div>
-              <span className="text-xs text-surface-600">Upload PDF</span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-surface-300" />
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-arcus-50">
-                <Sparkles className="h-5 w-5 text-arcus-500" />
-              </div>
-              <span className="text-xs text-surface-600">AI Generates</span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-surface-300" />
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
-                <Layers className="h-5 w-5 text-emerald-500" />
-              </div>
-              <span className="text-xs text-surface-600">Study Cards</span>
-            </div>
-          </div>
+          <p className="mt-1 text-sm text-surface-500">
+            Generate flashcards from your uploaded documents to get started.
+          </p>
+          <Link
+            href="/dashboard/documents"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-arcus-600 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-arcus-700"
+          >
+            Go to Documents
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-      </div>
-
-      {/* ── Deck Grid (placeholder for future) ── */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Placeholder deck cards will go here */}
-      </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {decks.map((deck) => (
+            <div
+              key={deck.id}
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white transition-all hover:border-arcus-300 hover:shadow-lg hover:shadow-arcus-500/5"
+            >
+              <div className="p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-arcus-50 text-arcus-600">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (confirm("Delete this deck?")) {
+                        deleteDeck.mutate({ id: deck.id });
+                      }
+                    }}
+                    className="rounded-lg p-2 text-surface-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <h3 className="mb-1 text-lg font-bold text-surface-900 line-clamp-1">
+                  {deck.title}
+                </h3>
+                <div className="flex items-center gap-2 text-xs text-surface-500">
+                  <FileText className="h-3 w-3" />
+                  <span className="truncate">{deck.document.title}</span>
+                </div>
+              </div>
+              <div className="mt-auto border-t border-surface-100 bg-surface-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-surface-600">
+                    <Layers className="h-4 w-4 text-surface-400" />
+                    {deck._count.cards} cards
+                  </div>
+                  <Link
+                    href={`/dashboard/flashcards/${deck.id}`}
+                    className="flex items-center gap-1.5 text-sm font-semibold text-arcus-600 hover:text-arcus-700"
+                  >
+                    Study Now
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/server/auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";

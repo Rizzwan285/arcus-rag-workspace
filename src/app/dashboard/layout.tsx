@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   CalendarDays,
+  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";

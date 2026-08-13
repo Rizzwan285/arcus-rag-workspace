@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 export const quizRouter = createTRPCRouter({
   // Get all quizzes for the user
   getQuizzes: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.quiz.findMany({
+    return ctx.prisma.quiz.findMany({
       where: {
         document: {
           userId: ctx.session.user.id,
@@ -27,7 +27,7 @@ export const quizRouter = createTRPCRouter({
   getQuizById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const quiz = await ctx.db.quiz.findUnique({
+      const quiz = await ctx.prisma.quiz.findUnique({
         where: { id: input.id },
         include: {
           questions: true,
@@ -52,7 +52,7 @@ export const quizRouter = createTRPCRouter({
   deleteQuiz: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const quiz = await ctx.db.quiz.findUnique({
+      const quiz = await ctx.prisma.quiz.findUnique({
         where: { id: input.id },
         include: { document: { select: { userId: true } } },
       });
@@ -65,7 +65,7 @@ export const quizRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
-      await ctx.db.quiz.delete({
+      await ctx.prisma.quiz.delete({
         where: { id: input.id },
       });
 

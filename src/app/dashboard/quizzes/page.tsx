@@ -1,88 +1,106 @@
 "use client";
 
-import {
-  Brain,
-  FileText,
-  ChevronRight,
-  Sparkles,
-  Target,
-  Trophy,
-  BarChart3,
-} from "lucide-react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { HelpCircle, Layers, Trash2, ArrowRight, FileText, Loader2, Brain } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
 
 export default function QuizzesPage() {
+  const { data: session } = useSession();
+  
+  const { data: quizzes = [], isLoading, refetch } = trpc.quiz.getQuizzes.useQuery(undefined, {
+    enabled: !!session?.user,
+  });
+
+  const deleteQuiz = trpc.quiz.deleteQuiz.useMutation({
+    onSuccess: () => refetch(),
+  });
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-surface-900">
             Quizzes
           </h1>
           <p className="mt-1 text-surface-500">
-            Test your understanding with AI-generated quizzes
+            Test your knowledge with AI-generated quizzes
           </p>
         </div>
       </div>
 
-      {/* ── Empty State ── */}
-      <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50">
-          <Brain className="h-10 w-10 text-amber-500" />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
         </div>
-        <h2 className="mb-2 text-xl font-bold text-surface-900">
-          No Quizzes Yet
-        </h2>
-        <p className="mx-auto mb-8 max-w-sm text-sm text-surface-500">
-          Generate multiple-choice quizzes from your documents to test your
-          knowledge and identify learning gaps.
-        </p>
-
-        {/* How it works */}
-        <div className="mx-auto max-w-lg rounded-xl border border-surface-200 bg-surface-50 p-6">
-          <h3 className="mb-4 text-sm font-semibold text-surface-700">
-            How It Works
+      ) : quizzes.length === 0 ? (
+        <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
+          <Brain className="mx-auto mb-4 h-12 w-12 text-surface-300" />
+          <h3 className="text-lg font-semibold text-surface-900">
+            No Quizzes Yet
           </h3>
-          <div className="flex items-center justify-center gap-4">
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                <FileText className="h-5 w-5 text-blue-500" />
-              </div>
-              <span className="text-xs text-surface-600">Upload PDF</span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-surface-300" />
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-arcus-50">
-                <Sparkles className="h-5 w-5 text-arcus-500" />
-              </div>
-              <span className="text-xs text-surface-600">AI Creates Quiz</span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-surface-300" />
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
-                <Target className="h-5 w-5 text-amber-500" />
-              </div>
-              <span className="text-xs text-surface-600">Take Quiz</span>
-            </div>
-          </div>
+          <p className="mt-1 text-sm text-surface-500">
+            Generate multiple-choice quizzes from your documents to test yourself.
+          </p>
+          <Link
+            href="/dashboard/documents"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-arcus-600 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-arcus-700"
+          >
+            Go to Documents
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-
-        {/* Stats Teaser */}
-        <div className="mx-auto mt-6 flex max-w-xs justify-center gap-6">
-          <div className="flex items-center gap-2 text-xs text-surface-500">
-            <Trophy className="h-4 w-4 text-amber-400" />
-            Track scores
-          </div>
-          <div className="flex items-center gap-2 text-xs text-surface-500">
-            <BarChart3 className="h-4 w-4 text-arcus-400" />
-            Identify gaps
-          </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {quizzes.map((quiz) => (
+            <div
+              key={quiz.id}
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white transition-all hover:border-arcus-300 hover:shadow-lg hover:shadow-arcus-500/5"
+            >
+              <div className="p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <HelpCircle className="h-5 w-5" />
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (confirm("Delete this quiz?")) {
+                        deleteQuiz.mutate({ id: quiz.id });
+                      }
+                    }}
+                    className="rounded-lg p-2 text-surface-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <h3 className="mb-1 text-lg font-bold text-surface-900 line-clamp-1">
+                  {quiz.title}
+                </h3>
+                <div className="flex items-center gap-2 text-xs text-surface-500">
+                  <FileText className="h-3 w-3" />
+                  <span className="truncate">{quiz.document.title}</span>
+                </div>
+              </div>
+              <div className="mt-auto border-t border-surface-100 bg-surface-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-surface-600">
+                    <Layers className="h-4 w-4 text-surface-400" />
+                    {quiz._count.questions} questions
+                  </div>
+                  <Link
+                    href={`/dashboard/quizzes/${quiz.id}`}
+                    className="flex items-center gap-1.5 text-sm font-semibold text-purple-600 hover:text-purple-700"
+                  >
+                    Take Quiz
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-
-      {/* ── Quiz Grid (placeholder for future) ── */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Quiz cards will go here */}
-      </div>
+      )}
     </div>
   );
 }
