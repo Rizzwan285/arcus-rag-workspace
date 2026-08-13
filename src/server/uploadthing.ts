@@ -1,6 +1,8 @@
 import { createUploadthing, type FileRouter } from "uploadthing/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/server/db/prisma";
+import { ingestDocument } from "@/server/services/ingestion";
 
 const f = createUploadthing();
 
@@ -14,6 +16,7 @@ export const ourFileRouter = {
    * - Requires authenticated user
    * - Accepts PDF files up to 32MB
    * - Max 5 files per upload
+   * - Triggers document ingestion pipeline on completion
    */
   pdfUploader: f({ pdf: { maxFileSize: "32MB", maxFileCount: 5 } })
     .middleware(async ({ req }) => {
@@ -30,8 +33,29 @@ export const ourFileRouter = {
       console.log("Upload complete for user:", metadata.userId);
       console.log("File URL:", file.ufsUrl);
 
+      // 1. Create Document record in the database with PENDING status
+      const doc = await prisma.document.create({
+        data: {
+          userId: metadata.userId,
+          title: file.name.replace(/\.pdf$/i, ""),
+          fileUrl: file.ufsUrl,
+          fileType: "pdf",
+          status: "PENDING",
+        },
+      });
+
+      // 2. Trigger the ingestion pipeline (fire-and-forget)
+      // The pipeline will: fetch PDF → parse → chunk → embed → store
+      // Status updates: PENDING → PROCESSING → COMPLETED/FAILED
+      ingestDocument(doc.id, file.ufsUrl).catch((error) => {
+        console.error(
+          `[UploadThing] Ingestion failed for document ${doc.id}:`,
+          error
+        );
+      });
+
       // Return data to the client callback
-      return { uploadedBy: metadata.userId, fileUrl: file.ufsUrl };
+      return { documentId: doc.id, fileUrl: file.ufsUrl };
     }),
 } satisfies FileRouter;
 

@@ -45,6 +45,24 @@ export const documentRouter = createTRPCRouter({
     }),
 
   /**
+   * Get real-time processing status for a document.
+   * Used by the UI to poll for status updates during ingestion.
+   */
+  getStatus: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const doc = await ctx.prisma.document.findUnique({
+        where: { id: input.id, userId: ctx.user.id },
+        select: {
+          status: true,
+          pageCount: true,
+          _count: { select: { chunks: true } },
+        },
+      });
+      return doc;
+    }),
+
+  /**
    * Create a new document record (after file upload)
    */
   create: protectedProcedure

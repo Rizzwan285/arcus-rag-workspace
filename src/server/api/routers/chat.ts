@@ -1,98 +1,109 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/server/api/trpc";
 
 export const chatRouter = createTRPCRouter({
   /**
-   * Get all chat sessions for a user
+   * Create a new chat session for the authenticated user.
    */
-  getSessions: publicProcedure
-    .input(z.object({ userId: z.string().optional() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.prisma.chatSession.findMany({
-        where: input.userId ? { userId: input.userId } : undefined,
-        orderBy: { updatedAt: "desc" },
-        include: {
-          _count: { select: { messages: true } },
-        },
-      });
-    }),
-
-  /**
-   * Get messages for a chat session
-   */
-  getMessages: publicProcedure
+  createSession: protectedProcedure
     .input(
       z.object({
-        sessionId: z.string(),
-        limit: z.number().min(1).max(100).default(50),
-        cursor: z.string().optional(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const messages = await ctx.prisma.chatMessage.findMany({
-        where: { sessionId: input.sessionId },
-        orderBy: { createdAt: "asc" },
-        take: input.limit + 1,
-        cursor: input.cursor ? { id: input.cursor } : undefined,
-      });
-
-      let nextCursor: string | undefined;
-      if (messages.length > input.limit) {
-        const nextItem = messages.pop();
-        nextCursor = nextItem?.id;
-      }
-
-      return { messages, nextCursor };
-    }),
-
-  /**
-   * Create a new chat session
-   */
-  createSession: publicProcedure
-    .input(
-      z.object({
-        userId: z.string(),
         title: z.string().default("New Chat"),
       })
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.chatSession.create({
-        data: input,
+        data: {
+          userId: ctx.user.id,
+          title: input.title,
+        },
       });
     }),
 
   /**
-   * Add a message to a chat session
+   * Get all chat sessions for the authenticated user.
+   * Ordered by most recently updated first.
    */
-  addMessage: publicProcedure
+  getSessions: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.chatSession.findMany({
+      where: { userId: ctx.user.id },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        _count: { select: { messages: true } },
+      },
+    });
+  }),
+
+  /**
+   * Get messages for a specific chat session.
+   * Verifies the session belongs to the authenticated user.
+   */
+  getSessionMessages: protectedProcedure
     .input(
       z.object({
         sessionId: z.string(),
-        role: z.enum(["USER", "AI", "SYSTEM"]),
-        content: z.string(),
-        sources: z.any().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      // Update session's updatedAt timestamp
-      await ctx.prisma.chatSession.update({
-        where: { id: input.sessionId },
-        data: { updatedAt: new Date() },
+    .query(async ({ ctx, input }) => {
+      // Verify session ownership
+      const session = await ctx.prisma.chatSession.findFirst({
+        where: {
+          id: input.sessionId,
+          userId: ctx.user.id,
+        },
       });
 
-      return ctx.prisma.chatMessage.create({
-        data: input,
+      if (!session) {
+        throw new Error("Chat session not found");
+      }
+
+      return ctx.prisma.chatMessage.findMany({
+        where: { sessionId: input.sessionId },
+        orderBy: { createdAt: "asc" },
       });
     }),
 
   /**
-   * Delete a chat session
+   * Update the title of a chat session.
    */
-  deleteSession: publicProcedure
-    .input(z.object({ id: z.string() }))
+  updateSessionTitle: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        title: z.string().min(1).max(200),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.chatSession.update({
+        where: { id: input.sessionId },
+        data: { title: input.title },
+      });
+    }),
+
+  /**
+   * Delete a chat session and all its messages (cascade).
+   * Verifies the session belongs to the authenticated user.
+   */
+  deleteSession: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership before deleting
+      const session = await ctx.prisma.chatSession.findFirst({
+        where: {
+          id: input.sessionId,
+          userId: ctx.user.id,
+        },
+      });
+
+      if (!session) {
+        throw new Error("Chat session not found");
+      }
+
       return ctx.prisma.chatSession.delete({
-        where: { id: input.id },
+        where: { id: input.sessionId },
       });
     }),
 });

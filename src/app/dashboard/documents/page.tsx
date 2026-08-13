@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -15,9 +15,14 @@ import {
   Search,
   X,
   File,
+  Layers,
+  BookOpen,
+  RefreshCw,
+  Zap,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+import { useUploadThing } from "@/lib/uploadthing";
 
 const statusConfig = {
   PENDING: {
@@ -25,28 +30,36 @@ const statusConfig = {
     label: "Pending",
     color: "text-amber-600",
     bg: "bg-amber-50",
+    border: "border-amber-200",
     animate: false,
+    description: "Waiting to start processing",
   },
   PROCESSING: {
     icon: Loader2,
     label: "Processing",
     color: "text-blue-600",
     bg: "bg-blue-50",
+    border: "border-blue-200",
     animate: true,
+    description: "Extracting text & generating embeddings",
   },
   COMPLETED: {
     icon: CheckCircle,
     label: "Ready",
     color: "text-emerald-600",
     bg: "bg-emerald-50",
+    border: "border-emerald-200",
     animate: false,
+    description: "Searchable — ready for AI chat",
   },
   FAILED: {
     icon: AlertCircle,
     label: "Failed",
     color: "text-red-600",
     bg: "bg-red-50",
+    border: "border-red-200",
     animate: false,
+    description: "Processing error occurred",
   },
 };
 
@@ -65,15 +78,54 @@ export default function DocumentsPage() {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   // tRPC queries & mutations
-  const { data: documents = [], refetch } = trpc.document.getAll.useQuery(
-    undefined,
-    { enabled: !!session?.user }
-  );
-  const createDocument = trpc.document.create.useMutation({
-    onSuccess: () => refetch(),
+  const {
+    data: documents = [],
+    refetch,
+    isLoading,
+  } = trpc.document.getAll.useQuery(undefined, {
+    enabled: !!session?.user,
+    // Auto-poll every 3s if any documents are still processing
+    refetchInterval: (query) => {
+      const docs = query.state.data;
+      if (!docs) return false;
+      const hasProcessing = docs.some(
+        (d) => d.status === "PROCESSING" || d.status === "PENDING"
+      );
+      return hasProcessing ? 3000 : false;
+    },
   });
+
   const deleteDocument = trpc.document.delete.useMutation({
     onSuccess: () => refetch(),
+  });
+
+  // UploadThing integration
+  const { startUpload, isUploading } = useUploadThing("pdfUploader", {
+    onClientUploadComplete: (res) => {
+      console.log("Upload complete:", res);
+      // Mark all uploading files as done
+      setUploadingFiles((prev) =>
+        prev.map((f) => ({ ...f, progress: 100, status: "done" as const }))
+      );
+      // Refetch documents to show the new ones
+      refetch();
+      // Clear upload state after a delay
+      setTimeout(() => setUploadingFiles([]), 2000);
+    },
+    onUploadError: (error) => {
+      console.error("Upload error:", error);
+      setUploadingFiles((prev) =>
+        prev.map((f) => ({ ...f, status: "error" as const }))
+      );
+      setTimeout(() => setUploadingFiles([]), 4000);
+    },
+    onUploadProgress: (progress) => {
+      setUploadingFiles((prev) =>
+        prev.map((f) =>
+          f.status === "uploading" ? { ...f, progress } : f
+        )
+      );
+    },
   });
 
   const handleFileUpload = useCallback(
@@ -93,61 +145,10 @@ export default function DocumentsPage() {
         pdfFiles.map((f) => ({ name: f.name, progress: 0, status: "uploading" }))
       );
 
-      for (let i = 0; i < pdfFiles.length; i++) {
-        const file = pdfFiles[i];
-        try {
-          // Upload via UploadThing endpoint
-          const formData = new FormData();
-          formData.append("files", file);
-
-          // Simulate progress (UploadThing handles this internally)
-          setUploadingFiles((prev) =>
-            prev.map((f, idx) =>
-              idx === i ? { ...f, progress: 30 } : f
-            )
-          );
-
-          const res = await fetch("/api/uploadthing", {
-            method: "POST",
-            headers: {
-              "x-uploadthing-package": "@uploadthing/react",
-            },
-          });
-
-          // For now, create a document record with a placeholder URL
-          // The actual UploadThing upload flow uses their React components
-          const title = file.name.replace(/\.pdf$/i, "");
-
-          setUploadingFiles((prev) =>
-            prev.map((f, idx) =>
-              idx === i ? { ...f, progress: 70 } : f
-            )
-          );
-
-          await createDocument.mutateAsync({
-            title,
-            fileUrl: `uploadthing://pending/${file.name}`,
-            fileType: "pdf",
-          });
-
-          setUploadingFiles((prev) =>
-            prev.map((f, idx) =>
-              idx === i ? { ...f, progress: 100, status: "done" } : f
-            )
-          );
-        } catch {
-          setUploadingFiles((prev) =>
-            prev.map((f, idx) =>
-              idx === i ? { ...f, status: "error" } : f
-            )
-          );
-        }
-      }
-
-      // Clear upload state after a delay
-      setTimeout(() => setUploadingFiles([]), 3000);
+      // Upload via UploadThing (this triggers onUploadComplete on the server)
+      await startUpload(pdfFiles);
     },
-    [session, router, createDocument]
+    [session, router, startUpload]
   );
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -176,15 +177,52 @@ export default function DocumentsPage() {
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const completedCount = documents.filter((d) => d.status === "COMPLETED").length;
+  const processingCount = documents.filter(
+    (d) => d.status === "PROCESSING" || d.status === "PENDING"
+  ).length;
+  const totalChunks = documents.reduce(
+    (sum, d) => sum + (d._count?.chunks ?? 0),
+    0
+  );
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-surface-900">
-          Documents
-        </h1>
-        <p className="mt-1 text-surface-500">
-          Upload and manage your course materials
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-surface-900">
+            Documents
+          </h1>
+          <p className="mt-1 text-surface-500">
+            Upload and manage your course materials
+          </p>
+        </div>
+
+        {/* Stats Summary */}
+        {documents.length > 0 && (
+          <div className="hidden gap-4 sm:flex">
+            <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm">
+              <BookOpen className="h-4 w-4 text-emerald-600" />
+              <span className="font-medium text-emerald-700">
+                {completedCount} ready
+              </span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-sm">
+              <Layers className="h-4 w-4 text-blue-600" />
+              <span className="font-medium text-blue-700">
+                {totalChunks} chunks
+              </span>
+            </div>
+            {processingCount > 0 && (
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-sm">
+                <Zap className="h-4 w-4 text-amber-600" />
+                <span className="font-medium text-amber-700">
+                  {processingCount} processing
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Upload Zone ── */}
@@ -196,7 +234,8 @@ export default function DocumentsPage() {
           "relative cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all duration-300",
           isDragging
             ? "border-arcus-500 bg-arcus-50/50 shadow-lg shadow-arcus-500/10"
-            : "border-surface-300 bg-white hover:border-arcus-400 hover:bg-arcus-50/20"
+            : "border-surface-300 bg-white hover:border-arcus-400 hover:bg-arcus-50/20",
+          isUploading && "pointer-events-none opacity-60"
         )}
       >
         <label htmlFor="file-upload" className="cursor-pointer">
@@ -207,6 +246,7 @@ export default function DocumentsPage() {
             accept=".pdf"
             onChange={handleFileSelect}
             className="hidden"
+            disabled={isUploading}
           />
           <div
             className={cn(
@@ -216,16 +256,26 @@ export default function DocumentsPage() {
                 : "bg-surface-100 text-surface-400"
             )}
           >
-            <Upload className="h-8 w-8" />
+            {isUploading ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+              <Upload className="h-8 w-8" />
+            )}
           </div>
           <p className="text-lg font-semibold text-surface-900">
-            {isDragging ? "Drop your files here" : "Upload Documents"}
+            {isDragging
+              ? "Drop your files here"
+              : isUploading
+              ? "Uploading..."
+              : "Upload Documents"}
           </p>
           <p className="mt-1 text-sm text-surface-500">
-            Drag & drop PDF files or click to browse
+            {isUploading
+              ? "Your files are being uploaded and will be processed automatically"
+              : "Drag & drop PDF files or click to browse"}
           </p>
           <p className="mt-3 text-xs text-surface-400">
-            Supported: PDF • Max 32MB per file
+            Supported: PDF • Max 32MB per file • Up to 5 files
           </p>
         </label>
       </div>
@@ -273,6 +323,18 @@ export default function DocumentsPage() {
         </div>
       )}
 
+      {/* ── Processing Banner ── */}
+      {processingCount > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3">
+          <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+          <p className="text-sm font-medium text-blue-800">
+            {processingCount} document{processingCount > 1 ? "s" : ""} being
+            processed — extracting text and generating embeddings...
+          </p>
+          <RefreshCw className="ml-auto h-4 w-4 text-blue-400 animate-pulse" />
+        </div>
+      )}
+
       {/* ── Search ── */}
       {documents.length > 0 && (
         <div className="relative">
@@ -296,7 +358,11 @@ export default function DocumentsPage() {
       )}
 
       {/* ── Document List ── */}
-      {filteredDocuments.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
+        </div>
+      ) : filteredDocuments.length === 0 ? (
         <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-surface-300" />
           <h3 className="text-lg font-semibold text-surface-900">
@@ -316,24 +382,73 @@ export default function DocumentsPage() {
             const status =
               statusConfig[doc.status as keyof typeof statusConfig];
             const StatusIcon = status.icon;
+            const chunkCount = doc._count?.chunks ?? 0;
 
             return (
               <div
                 key={doc.id}
-                className="group flex items-center gap-4 rounded-xl border border-surface-200 bg-white p-4 transition-all hover:border-surface-300 hover:shadow-sm"
+                className={cn(
+                  "group flex items-center gap-4 rounded-xl border bg-white p-4 transition-all hover:shadow-sm",
+                  doc.status === "PROCESSING"
+                    ? "border-blue-200 bg-blue-50/30"
+                    : doc.status === "FAILED"
+                    ? "border-red-200 bg-red-50/20"
+                    : "border-surface-200 hover:border-surface-300"
+                )}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-500">
+                <div
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-lg",
+                    doc.status === "COMPLETED"
+                      ? "bg-emerald-50 text-emerald-500"
+                      : doc.status === "PROCESSING"
+                      ? "bg-blue-50 text-blue-500"
+                      : doc.status === "FAILED"
+                      ? "bg-red-50 text-red-500"
+                      : "bg-surface-100 text-surface-400"
+                  )}
+                >
                   <FileText className="h-5 w-5" />
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-surface-900">{doc.title}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-surface-900 truncate">
+                    {doc.title}
+                  </p>
                   <p className="text-xs text-surface-500">
-                    {doc._count.chunks} chunks • Uploaded{" "}
-                    {new Date(doc.createdAt).toLocaleDateString()}
+                    {doc.status === "COMPLETED" && (
+                      <>
+                        {chunkCount} chunks
+                        {doc.pageCount && ` • ${doc.pageCount} pages`}
+                        {" • "}
+                      </>
+                    )}
+                    {doc.status === "PROCESSING" && (
+                      <span className="text-blue-600">
+                        Processing — extracting text & embeddings...
+                      </span>
+                    )}
+                    {doc.status === "FAILED" && (
+                      <span className="text-red-600">
+                        Processing failed — try re-uploading
+                      </span>
+                    )}
+                    {(doc.status === "COMPLETED" || doc.status === "PENDING") && (
+                      <>
+                        Uploaded{" "}
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                      </>
+                    )}
                   </p>
                 </div>
+
+                {/* Status Badge */}
                 <div
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${status.bg} ${status.color}`}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+                    status.bg,
+                    status.color
+                  )}
+                  title={status.description}
                 >
                   <StatusIcon
                     className={cn(
