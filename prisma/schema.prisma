@@ -1,0 +1,192 @@
+// Arcus – AI-Powered Academic Workspace
+// Database schema with pgvector support for RAG
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// ──────────────────────────────────────────
+// Authentication & Users
+// ──────────────────────────────────────────
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  documents     Document[]
+  chatSessions  ChatSession[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ──────────────────────────────────────────
+// Documents & Embeddings
+// ──────────────────────────────────────────
+
+model Document {
+  id             String          @id @default(cuid())
+  userId         String
+  title          String
+  fileUrl        String
+  fileType       String          @default("pdf")
+  status         DocumentStatus  @default(PENDING)
+  pageCount      Int?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks         DocumentChunk[]
+  flashcardDecks FlashcardDeck[]
+  quizzes        Quiz[]
+
+  @@index([userId])
+}
+
+model DocumentChunk {
+  id         String                    @id @default(cuid())
+  documentId String
+  content    String
+  metadata   Json?
+  pageNumber Int?
+  chunkIndex Int
+  embedding  Unsupported("vector(768)")
+  document   Document                  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ──────────────────────────────────────────
+// Chat Sessions & Messages
+// ──────────────────────────────────────────
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  title     String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  role      MessageRole
+  content   String      @db.Text
+  sources   Json?       // References to document chunks used
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+enum MessageRole {
+  USER
+  AI
+  SYSTEM
+}
+
+// ──────────────────────────────────────────
+// Study Modules: Flashcards
+// ──────────────────────────────────────────
+
+model FlashcardDeck {
+  id         String      @id @default(cuid())
+  documentId String
+  title      String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  document   Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  cards      Flashcard[]
+
+  @@index([documentId])
+}
+
+model Flashcard {
+  id     String        @id @default(cuid())
+  deckId String
+  front  String        @db.Text
+  back   String        @db.Text
+  deck   FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+}
+
+// ──────────────────────────────────────────
+// Study Modules: Quizzes
+// ──────────────────────────────────────────
+
+model Quiz {
+  id         String         @id @default(cuid())
+  documentId String
+  title      String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  questions  QuizQuestion[]
+
+  @@index([documentId])
+}
+
+model QuizQuestion {
+  id            String  @id @default(cuid())
+  quizId        String
+  question      String  @db.Text
+  options       String[]
+  correctAnswer String
+  explanation   String? @db.Text
+  quiz          Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
