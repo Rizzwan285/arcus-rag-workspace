@@ -2,7 +2,7 @@ import { createUploadthing, type FileRouter } from "uploadthing/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
-import { ingestDocument } from "@/server/services/ingestion";
+import { inngest } from "@/inngest/client";
 
 const f = createUploadthing();
 
@@ -44,14 +44,15 @@ export const ourFileRouter = {
         },
       });
 
-      // 2. Trigger the ingestion pipeline (fire-and-forget)
+      // 2. Trigger the Inngest background job
       // The pipeline will: fetch PDF → parse → chunk → embed → store
       // Status updates: PENDING → PROCESSING → COMPLETED/FAILED
-      ingestDocument(doc.id, file.ufsUrl).catch((error) => {
-        console.error(
-          `[UploadThing] Ingestion failed for document ${doc.id}:`,
-          error
-        );
+      await inngest.send({
+        name: "document/ingest",
+        data: {
+          documentId: doc.id,
+          fileUrl: file.ufsUrl,
+        },
       });
 
       // Return data to the client callback
