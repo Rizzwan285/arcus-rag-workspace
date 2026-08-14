@@ -220,7 +220,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <div className="flex items-start justify-between">
+      <div className="animate-fade-in flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-surface-900">
             Documents
@@ -232,23 +232,23 @@ export default function DocumentsPage() {
 
         {/* Stats Summary */}
         {documents.length > 0 && (
-          <div className="hidden gap-4 sm:flex">
-            <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm">
-              <BookOpen className="h-4 w-4 text-emerald-600" />
-              <span className="font-medium text-emerald-700">
+          <div className="hidden gap-3 sm:flex">
+            <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium">
+              <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
+              <span className="text-emerald-700">
                 {completedCount} ready
               </span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-sm">
-              <Layers className="h-4 w-4 text-blue-600" />
-              <span className="font-medium text-blue-700">
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium">
+              <Layers className="h-3.5 w-3.5 text-blue-600" />
+              <span className="text-blue-700">
                 {totalChunks} chunks
               </span>
             </div>
             {processingCount > 0 && (
-              <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-sm">
-                <Zap className="h-4 w-4 text-amber-600" />
-                <span className="font-medium text-amber-700">
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium">
+                <Zap className="h-3.5 w-3.5 text-amber-600" />
+                <span className="text-amber-700">
                   {processingCount} processing
                 </span>
               </div>
@@ -395,7 +395,7 @@ export default function DocumentsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
         </div>
       ) : filteredDocuments.length === 0 ? (
-        <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
+        <div className="card p-16 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-surface-300" />
           <h3 className="text-lg font-semibold text-surface-900">
             {documents.length === 0
@@ -420,7 +420,7 @@ export default function DocumentsPage() {
               <div
                 key={doc.id}
                 className={cn(
-                  "group flex items-center gap-4 rounded-xl border bg-white p-4 transition-all hover:shadow-sm",
+                  "card group flex items-center gap-4 p-4",
                   doc.status === "PROCESSING"
                     ? "border-blue-200 bg-blue-50/30"
                     : doc.status === "FAILED"

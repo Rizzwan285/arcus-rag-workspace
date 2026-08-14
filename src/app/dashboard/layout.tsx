@@ -13,46 +13,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
-  Sparkles,
   LogOut,
   User,
   CalendarDays,
-  HelpCircle,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Documents",
-    href: "/dashboard/documents",
-    icon: FileText,
-  },
-  {
-    label: "Chat",
-    href: "/dashboard/chat",
-    icon: MessageSquare,
-  },
-  {
-    label: "Calendar",
-    href: "/dashboard/calendar",
-    icon: CalendarDays,
-  },
-  {
-    label: "Flashcards",
-    href: "/dashboard/flashcards",
-    icon: BookOpen,
-  },
-  {
-    label: "Quizzes",
-    href: "/dashboard/quizzes",
-    icon: Brain,
-  },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Documents", href: "/dashboard/documents", icon: FileText },
+  { label: "Chat", href: "/dashboard/chat", icon: MessageSquare },
+  { label: "Calendar", href: "/dashboard/calendar", icon: CalendarDays },
+  { label: "Flashcards", href: "/dashboard/flashcards", icon: BookOpen },
+  { label: "Quizzes", href: "/dashboard/quizzes", icon: Brain },
 ];
 
 export default function DashboardLayout({
@@ -67,20 +42,21 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-surface-50">
-      {/* ── Sidebar ── */}
+      {/* ── Dark Sidebar ── */}
       <aside
         className={cn(
-          "flex flex-col border-r border-surface-200 bg-white transition-all duration-300",
-          collapsed ? "w-[72px]" : "w-64"
+          "flex flex-col transition-all duration-300",
+          collapsed ? "w-[72px]" : "w-64",
+          "bg-sidebar-bg"
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-surface-200 px-4">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-arcus-500 to-arcus-700 font-bold text-white shadow-md">
+        <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-arcus-500 to-arcus-700 font-bold text-white shadow-lg shadow-arcus-600/30">
             A
           </div>
           {!collapsed && (
-            <span className="text-lg font-bold tracking-tight text-surface-900">
+            <span className="text-lg font-bold tracking-tight text-sidebar-text-active">
               Arcus
             </span>
           )}
@@ -100,8 +76,8 @@ export default function DashboardLayout({
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-arcus-50 text-arcus-700 shadow-sm"
-                    : "text-surface-500 hover:bg-surface-100 hover:text-surface-900"
+                    ? "sidebar-active-glow bg-arcus-600/10 text-sidebar-text-active"
+                    : "text-sidebar-text hover:bg-sidebar-surface hover:text-sidebar-text-active"
                 )}
                 title={collapsed ? item.label : undefined}
               >
@@ -109,8 +85,8 @@ export default function DashboardLayout({
                   className={cn(
                     "h-5 w-5 flex-shrink-0 transition-colors",
                     isActive
-                      ? "text-arcus-600"
-                      : "text-surface-400 group-hover:text-surface-600"
+                      ? "text-arcus-400"
+                      : "text-sidebar-text group-hover:text-sidebar-text-active"
                   )}
                 />
                 {!collapsed && <span>{item.label}</span>}
@@ -120,24 +96,24 @@ export default function DashboardLayout({
         </nav>
 
         {/* Upload Button */}
-        <div className="border-t border-surface-200 p-3">
+        <div className="border-t border-sidebar-border p-3">
           <Link
             href="/dashboard/documents"
             className={cn(
-              "flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-arcus-600 to-arcus-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-arcus-600/20 transition-all hover:shadow-arcus-600/30",
+              "flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-arcus-600 to-arcus-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-arcus-600/25 transition-all hover:shadow-arcus-600/40",
               collapsed ? "px-2" : ""
             )}
           >
             <Upload className="h-4 w-4" />
-            {!collapsed && <span>Upload Document</span>}
+            {!collapsed && <span>Upload</span>}
           </Link>
         </div>
 
         {/* Collapse Toggle */}
-        <div className="border-t border-surface-200 p-3">
+        <div className="border-t border-sidebar-border p-3">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex w-full items-center justify-center rounded-lg py-2 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600"
+            className="flex w-full items-center justify-center rounded-lg py-2 text-sidebar-text transition-colors hover:bg-sidebar-surface hover:text-sidebar-text-active"
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -151,17 +127,21 @@ export default function DashboardLayout({
       {/* ── Main Content ── */}
       <main className="flex-1 overflow-auto">
         {/* Top Bar */}
-        <header className="flex h-16 items-center justify-between border-b border-surface-200 bg-white/80 px-8 backdrop-blur-sm">
+        <header className="flex h-14 items-center justify-between border-b border-surface-200 bg-white/80 px-8 backdrop-blur-sm">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-arcus-500" />
-            <span className="text-sm text-surface-500">
-              AI-Powered Academic Workspace
+            <Sparkles className="h-3.5 w-3.5 text-arcus-500" />
+            <span className="text-xs font-medium tracking-wide text-surface-400 uppercase">
+              AI-Powered Workspace
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="rounded-lg p-2 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600">
-              <Settings className="h-5 w-5" />
-            </button>
+          <div className="flex items-center gap-3">
+            {/* Settings Link */}
+            <Link
+              href="/dashboard/settings"
+              className="rounded-lg p-2 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
 
             {/* User Avatar & Menu */}
             <div className="relative">
@@ -199,6 +179,14 @@ export default function DashboardLayout({
                       </p>
                     </div>
                     <div className="p-1">
+                      <Link
+                        href="/dashboard/settings"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-surface-600 transition-colors hover:bg-surface-100"
+                      >
+                        <Settings className="h-4 w-4" />
+                        Settings
+                      </Link>
                       <button
                         onClick={() => signOut({ callbackUrl: "/" })}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"

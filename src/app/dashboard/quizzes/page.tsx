@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc/client";
 
 export default function QuizzesPage() {
   const { data: session } = useSession();
-  
+
   const { data: quizzes = [], isLoading, refetch } = trpc.quiz.getQuizzes.useQuery(undefined, {
     enabled: !!session?.user,
   });
@@ -18,15 +18,13 @@ export default function QuizzesPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-surface-900">
-            Quizzes
-          </h1>
-          <p className="mt-1 text-surface-500">
-            Test your knowledge with AI-generated quizzes
-          </p>
-        </div>
+      <div className="animate-fade-in">
+        <h1 className="text-3xl font-bold tracking-tight text-surface-900">
+          Quizzes
+        </h1>
+        <p className="mt-1 text-surface-500">
+          Test your knowledge with AI-generated quizzes
+        </p>
       </div>
 
       {isLoading ? (
@@ -34,7 +32,7 @@ export default function QuizzesPage() {
           <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
         </div>
       ) : quizzes.length === 0 ? (
-        <div className="rounded-2xl border border-surface-200 bg-white p-16 text-center">
+        <div className="card animate-fade-in animate-delay-1 p-16 text-center">
           <Brain className="mx-auto mb-4 h-12 w-12 text-surface-300" />
           <h3 className="text-lg font-semibold text-surface-900">
             No Quizzes Yet
@@ -51,11 +49,11 @@ export default function QuizzesPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz) => (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {quizzes.map((quiz: any, i: number) => (
             <div
               key={quiz.id}
-              className="group relative flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white transition-all hover:border-arcus-300 hover:shadow-lg hover:shadow-arcus-500/5"
+              className={`card group relative flex flex-col overflow-hidden animate-fade-in animate-delay-${Math.min(i + 1, 6)}`}
             >
               <div className="p-6">
                 <div className="mb-4 flex items-center justify-between">
@@ -69,7 +67,7 @@ export default function QuizzesPage() {
                         deleteQuiz.mutate({ id: quiz.id });
                       }
                     }}
-                    className="rounded-lg p-2 text-surface-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg p-2 text-surface-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Color Palette ── */
+  /* ── Brand Palette ── */
   --color-arcus-50: #f0f0ff;
   --color-arcus-100: #e0dffe;
   --color-arcus-200: #c6c4fd;
@@ -15,17 +15,33 @@
   --color-arcus-900: #331987;
   --color-arcus-950: #1e0d5c;
 
-  --color-surface-50: #fafafa;
-  --color-surface-100: #f4f4f5;
-  --color-surface-200: #e4e4e7;
-  --color-surface-300: #d4d4d8;
-  --color-surface-400: #a1a1aa;
-  --color-surface-500: #71717a;
-  --color-surface-600: #52525b;
-  --color-surface-700: #3f3f46;
-  --color-surface-800: #27272a;
-  --color-surface-900: #18181b;
-  --color-surface-950: #09090b;
+  /* ── Warm Neutrals ── */
+  --color-surface-50: #faf9f7;
+  --color-surface-100: #f3f1ed;
+  --color-surface-200: #e8e5df;
+  --color-surface-300: #d4d0c8;
+  --color-surface-400: #a8a29e;
+  --color-surface-500: #78716c;
+  --color-surface-600: #57534e;
+  --color-surface-700: #44403c;
+  --color-surface-800: #292524;
+  --color-surface-900: #1c1917;
+  --color-surface-950: #0c0a09;
+
+  /* ── Dark Sidebar ── */
+  --color-sidebar-bg: #12111a;
+  --color-sidebar-surface: #1a1928;
+  --color-sidebar-border: #2a2840;
+  --color-sidebar-text: #a09cb8;
+  --color-sidebar-text-active: #f0eeff;
+
+  /* ── Warm Gold Accent ── */
+  --color-gold-50: #fefce8;
+  --color-gold-100: #fef9c3;
+  --color-gold-200: #fef08a;
+  --color-gold-300: #fde047;
+  --color-gold-400: #facc15;
+  --color-gold-500: #eab308;
 
   /* ── Typography ── */
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
@@ -49,7 +65,7 @@ body {
   background: var(--color-surface-50);
 }
 
-/* ── Animated Gradient Background ── */
+/* ── Landing Page: Animated Gradient Background ── */
 .gradient-bg {
   background: linear-gradient(
     135deg,
@@ -64,13 +80,8 @@ body {
 }
 
 @keyframes gradientShift {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 /* ── Glow Effects ── */
@@ -98,44 +109,83 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
+/* ── Warm Card Style ── */
+.card {
+  background: white;
+  border: 1px solid var(--color-surface-200);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(28, 25, 23, 0.04),
+    0 4px 12px rgba(28, 25, 23, 0.03);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow:
+    0 2px 4px rgba(28, 25, 23, 0.06),
+    0 8px 24px rgba(28, 25, 23, 0.06);
+  transform: translateY(-1px);
+}
+
+/* ── Sidebar Active Glow ── */
+.sidebar-active-glow {
+  position: relative;
+}
+
+.sidebar-active-glow::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, var(--color-arcus-400), var(--color-arcus-600));
+  box-shadow: 0 0 12px rgba(99, 70, 241, 0.4);
+}
+
 /* ── Floating Animation ── */
 @keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float-delayed { animation: float 6s ease-in-out 2s infinite; }
+.animate-float-slow { animation: float 8s ease-in-out 1s infinite; }
+
+/* ── Staggered Fade-in ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
-  50% {
-    transform: translateY(-20px);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.animate-float {
-  animation: float 6s ease-in-out infinite;
+.animate-fade-in {
+  animation: fadeInUp 0.4s ease-out forwards;
+  opacity: 0;
 }
 
-.animate-float-delayed {
-  animation: float 6s ease-in-out 2s infinite;
-}
-
-.animate-float-slow {
-  animation: float 8s ease-in-out 1s infinite;
-}
+.animate-delay-1 { animation-delay: 0.05s; }
+.animate-delay-2 { animation-delay: 0.1s; }
+.animate-delay-3 { animation-delay: 0.15s; }
+.animate-delay-4 { animation-delay: 0.2s; }
+.animate-delay-5 { animation-delay: 0.25s; }
+.animate-delay-6 { animation-delay: 0.3s; }
 
 /* ── Pulse Ring ── */
 @keyframes pulseRing {
-  0% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
 
-.animate-pulse-ring {
-  animation: pulseRing 2s ease-out infinite;
-}
+.animate-pulse-ring { animation: pulseRing 2s ease-out infinite; }
 
 /* ── Grid Pattern ── */
 .grid-pattern {
@@ -148,32 +198,18 @@ body {
 }
 
 /* ── Scrollbar Styling ── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--color-surface-300);
-  border-radius: 3px;
+  border-radius: 10px;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-surface-400);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--color-surface-400); }
 
 /* ── Shimmer Loading ── */
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .shimmer {
@@ -192,3 +228,11 @@ body {
   background: rgba(99, 70, 241, 0.3);
   color: white;
 }
+
+/* ── Status Dot Pulse ── */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-status-pulse { animation: statusPulse 1.5s ease-in-out infinite; }

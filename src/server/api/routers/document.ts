@@ -115,4 +115,23 @@ export const documentRouter = createTRPCRouter({
         where: { id: input.id, userId: ctx.user.id },
       });
     }),
+
+  /**
+   * Get aggregate stats for the dashboard home page.
+   */
+  getStats: protectedProcedure.query(async ({ ctx }) => {
+    const [documentCount, chatSessionCount, flashcardDeckCount, quizCount] =
+      await Promise.all([
+        ctx.prisma.document.count({ where: { userId: ctx.user.id } }),
+        ctx.prisma.chatSession.count({ where: { userId: ctx.user.id } }),
+        ctx.prisma.flashcardDeck.count({
+          where: { document: { userId: ctx.user.id } },
+        }),
+        ctx.prisma.quiz.count({
+          where: { document: { userId: ctx.user.id } },
+        }),
+      ]);
+
+    return { documentCount, chatSessionCount, flashcardDeckCount, quizCount };
+  }),
 });
