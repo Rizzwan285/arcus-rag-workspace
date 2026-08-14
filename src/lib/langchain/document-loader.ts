@@ -12,8 +12,6 @@
  * @see ADR-005 in .claude/decisions.md
  */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 
 /** Configuration for text chunking */
@@ -42,6 +40,9 @@ export interface ChunkedDocument {
 export async function loadAndChunkPDF(
   pdfBuffer: Buffer
 ): Promise<ChunkedDocument[]> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse");
+  
   // 1. Parse the PDF directly using pdf-parse
   const parsed = await pdfParse(pdfBuffer);
   const fullText: string = parsed.text;
@@ -82,6 +83,8 @@ export async function loadAndChunkPDF(
  * Get the page count from a PDF buffer without full parsing.
  */
 export async function getPDFPageCount(pdfBuffer: Buffer): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse");
   const parsed = await pdfParse(pdfBuffer);
   return parsed.numpages || 0;
 }
