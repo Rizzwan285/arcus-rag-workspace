@@ -1,7 +1,7 @@
 /**
  * Gemini Embedding Client
  *
- * Uses Google's Generative AI REST API directly for text-embedding-004.
+ * Uses Google's Generative AI REST API directly for gemini-embedding-001.
  * Outputs 768-dimensional vectors — matches our `vector(768)` column in DocumentChunk.
  *
  * We call the REST API directly instead of going through LangChain's wrapper
@@ -11,7 +11,7 @@
  */
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const EMBEDDING_MODEL = "text-embedding-004";
+const EMBEDDING_MODEL = "gemini-embedding-001";
 const EMBEDDING_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${GOOGLE_API_KEY}`;
 
 if (!GOOGLE_API_KEY) {
@@ -39,6 +39,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   const requests = texts.map((text) => ({
     model: `models/${EMBEDDING_MODEL}`,
     content: { parts: [{ text }] },
+    outputDimensionality: 768,
   }));
 
   const response = await fetch(EMBEDDING_API_URL, {
