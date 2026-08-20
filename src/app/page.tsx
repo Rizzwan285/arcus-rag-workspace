@@ -1,275 +1,299 @@
 import Link from "next/link";
 import {
+  ArrowRight,
   BookOpen,
   Brain,
-  FileText,
-  MessageSquare,
-  Sparkles,
-  ArrowRight,
-  Zap,
-  Calendar,
-  GraduationCap,
+  CalendarDays,
+  Database,
+  FileSearch,
+  GitBranch,
   Layers,
-  ChevronRight,
+  MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
+
+const capabilities = [
+  {
+    icon: MessageSquare,
+    title: "Grounded chat",
+    body: "Answers are constructed only from retrieved passages, with the source document and page attached to every claim.",
+  },
+  {
+    icon: BookOpen,
+    title: "Flashcards",
+    body: "Decks generated from a document's own content as structured output, not free-form prose.",
+  },
+  {
+    icon: Brain,
+    title: "Quizzes",
+    body: "Multiple-choice sets with explanations, scored in place and saved back to your workspace.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Deadline extraction",
+    body: "Tool calls pull dates and syllabus items out of documents and onto an academic calendar.",
+  },
+];
+
+const guarantees = [
+  {
+    icon: ShieldCheck,
+    title: "Idempotent writes",
+    body: "Every chunk is keyed by the SHA-256 of its text under a unique constraint. A retried job re-inserts the same rows and the database absorbs them — a half-finished run can be replayed verbatim.",
+  },
+  {
+    icon: GitBranch,
+    title: "Dead letter queue",
+    body: "FAILED means the retry budget is exhausted, not that something went wrong once. Terminal input skips retries entirely; everything else is redriveable from the UI with its error trace intact.",
+  },
+  {
+    icon: Layers,
+    title: "Run telemetry",
+    body: "Each attempt records latency, per-step timings, chunk yield, dedupe count, and estimated token spend — so p95 latency and cost per document are one SQL query away.",
+  },
+];
+
+const stack = [
+  ["Framework", "Next.js (App Router) · React · TypeScript"],
+  ["API", "tRPC · end-to-end type safety"],
+  ["Database", "PostgreSQL on Supabase · Prisma ORM"],
+  ["Vector store", "pgvector · HNSW · vector_cosine_ops"],
+  ["Lexical index", "tsvector generated column · GIN"],
+  ["Ingestion", "Inngest · LangChain splitters · zod contracts"],
+  ["Models", "Gemini embeddings · Gemini chat"],
+];
 
 export default function Home() {
   return (
-    <div className="gradient-bg grid-pattern min-h-screen text-white">
+    <div className="min-h-screen bg-surface-0">
       {/* ── Navigation ── */}
-      <nav className="glass fixed top-0 right-0 left-0 z-50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-arcus-500 to-arcus-700 font-bold text-white shadow-lg">
-                A
-              </div>
-              <div className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface-950 bg-emerald-400"></div>
-            </div>
-            <span className="text-xl font-bold tracking-tight">Arcus</span>
+      <nav className="sticky top-0 z-50 border-b border-line bg-surface-0/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1080px] items-center justify-between px-6">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-900 font-mono text-sm font-bold text-white">
+              A
+            </span>
+            <span className="text-sm font-semibold tracking-tight text-surface-900">
+              Arcus
+            </span>
           </div>
-          <div className="hidden items-center gap-8 md:flex">
-            <a
-              href="#features"
-              className="text-sm text-surface-400 transition-colors hover:text-white"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-sm text-surface-400 transition-colors hover:text-white"
-            >
-              How It Works
-            </a>
-            <a
-              href="#tech"
-              className="text-sm text-surface-400 transition-colors hover:text-white"
-            >
-              Technology
-            </a>
+
+          <div className="hidden items-center gap-7 md:flex">
+            {[
+              ["Retrieval", "#retrieval"],
+              ["Pipeline", "#pipeline"],
+              ["Stack", "#stack"],
+            ].map(([label, href]) => (
+              <a
+                key={href}
+                href={href}
+                className="text-sm text-surface-500 transition-colors hover:text-surface-900"
+              >
+                {label}
+              </a>
+            ))}
           </div>
+
           <Link
             href="/dashboard"
-            className="group flex items-center gap-2 rounded-full bg-arcus-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-arcus-500 hover:shadow-lg hover:shadow-arcus-600/25"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-surface-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-surface-800"
           >
-            Get Started
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            Open workspace
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </nav>
 
-      {/* ── Hero Section ── */}
-      <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 pt-20">
-        {/* Decorative Orbs */}
-        <div className="animate-float absolute top-32 left-20 h-72 w-72 rounded-full bg-arcus-500/10 blur-3xl"></div>
-        <div className="animate-float-delayed absolute right-20 bottom-32 h-96 w-96 rounded-full bg-purple-500/8 blur-3xl"></div>
-        <div className="animate-float-slow absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/5 blur-3xl"></div>
-
-        <div className="relative z-10 mx-auto max-w-5xl text-center">
-          {/* Badge */}
-          <div className="glass mb-8 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm">
-            <Sparkles className="h-4 w-4 text-arcus-400" />
-            <span className="text-surface-300">
-              AI-Powered Academic Workspace
-            </span>
-          </div>
-
-          {/* Headline */}
-          <h1 className="glow-text mb-6 text-5xl leading-tight font-extrabold tracking-tight md:text-7xl lg:text-8xl">
-            Your Study Materials,{" "}
-            <span className="bg-gradient-to-r from-arcus-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-              Supercharged
-            </span>
-          </h1>
-
-          {/* Subtitle */}
-          <p className="mx-auto mb-12 max-w-2xl text-lg leading-relaxed text-surface-400 md:text-xl">
-            Upload your course documents and let Arcus transform them into an
-            interactive learning experience — with AI chat, auto-generated
-            flashcards, quizzes, and smart scheduling.
+      {/* ── Hero ── */}
+      <section className="border-b border-line">
+        <div className="mx-auto max-w-[1080px] px-6 py-20 md:py-28">
+          <p className="mb-5 font-mono text-2xs tracking-[0.14em] text-surface-400 uppercase">
+            Academic retrieval workspace
           </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <h1 className="max-w-3xl text-4xl leading-[1.08] text-surface-900 md:text-6xl">
+            Ask your course material
+            <br />
+            <span className="text-surface-400">and get sourced answers.</span>
+          </h1>
+
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-surface-500">
+            Arcus indexes your PDFs for hybrid retrieval — dense vector search
+            and PostgreSQL full-text search, fused by rank — then answers only
+            from what it actually found.
+          </p>
+
+          <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link
               href="/dashboard"
-              className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-arcus-600 to-arcus-500 px-8 py-4 text-lg font-semibold text-white shadow-2xl shadow-arcus-600/20 transition-all hover:-translate-y-0.5 hover:shadow-arcus-600/30"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-surface-900 px-5 text-base font-medium text-white transition-colors hover:bg-surface-800"
             >
-              Start Learning
-              <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+              Open workspace
+              <ArrowRight className="h-4 w-4" />
             </Link>
             <a
-              href="#features"
-              className="glass flex items-center gap-3 rounded-2xl px-8 py-4 text-lg font-semibold text-surface-300 transition-all hover:-translate-y-0.5 hover:text-white"
+              href="#retrieval"
+              className="inline-flex h-11 items-center gap-2 rounded-md border border-line-strong px-5 text-base font-medium text-surface-700 transition-colors hover:bg-surface-50"
             >
-              Explore Features
+              How retrieval works
             </a>
           </div>
 
-          {/* Stats */}
-          <div className="glass mt-20 inline-flex divide-x divide-white/10 rounded-2xl">
+          {/* System line — the stack, stated plainly rather than claimed. */}
+          <div className="mt-14 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line pt-5 font-mono text-2xs text-surface-400">
             {[
-              { label: "Documents Processed", value: "∞" },
-              { label: "Study Modes", value: "4+" },
-              { label: "AI-Powered", value: "100%" },
-            ].map((stat) => (
-              <div key={stat.label} className="px-8 py-5">
-                <p className="text-2xl font-bold text-white">{stat.value}</p>
-                <p className="mt-1 text-xs text-surface-500">{stat.label}</p>
-              </div>
+              "pgvector/HNSW",
+              "tsvector/GIN",
+              "RRF k=60",
+              "SHA-256 idempotency",
+              "Inngest DLQ",
+              "run telemetry",
+            ].map((item, index) => (
+              <span key={item} className="flex items-center gap-2">
+                {index > 0 && <span className="text-surface-300">·</span>}
+                {item}
+              </span>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Features Section ── */}
-      <section id="features" className="relative px-6 py-32">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-20 text-center">
-            <p className="mb-3 text-sm font-semibold tracking-widest text-arcus-400 uppercase">
-              Features
-            </p>
-            <h2 className="mb-4 text-4xl font-bold md:text-5xl">
-              Everything You Need to{" "}
-              <span className="bg-gradient-to-r from-arcus-400 to-purple-400 bg-clip-text text-transparent">
-                Excel
-              </span>
-            </h2>
-            <p className="mx-auto max-w-xl text-surface-400">
-              Arcus combines cutting-edge AI with intuitive design to
-              revolutionize how you study and retain knowledge.
-            </p>
+      {/* ── Retrieval ── */}
+      <section id="retrieval" className="border-b border-line">
+        <div className="mx-auto max-w-[1080px] px-6 py-20">
+          <p className="mb-3 font-mono text-2xs tracking-[0.14em] text-surface-400 uppercase">
+            Retrieval
+          </p>
+          <h2 className="max-w-2xl text-3xl text-surface-900">
+            Two searches, fused by rank
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-surface-500">
+            Embeddings are good at paraphrase and bad at exact tokens — course
+            codes, theorem names, notation. Full-text search is the reverse.
+            Arcus runs both on every question and combines them with Reciprocal
+            Rank Fusion, so neither weakness reaches your answer.
+          </p>
+
+          {/* Fusion diagram */}
+          <div className="mt-12 grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-stretch">
+            <div className="panel p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Database className="h-4 w-4 text-surface-400" strokeWidth={1.75} />
+                <h3 className="text-sm font-semibold text-surface-900">
+                  Dense arm
+                </h3>
+              </div>
+              <p className="text-sm leading-relaxed text-surface-500">
+                Cosine distance over 768-dimensional Gemini embeddings, served
+                by an HNSW index. Finds passages that mean the same thing in
+                different words.
+              </p>
+              <div className="mt-4 space-y-1 border-t border-line pt-3 font-mono text-2xs text-surface-400">
+                <p>embedding &lt;=&gt; query::vector</p>
+                <p>USING hnsw (vector_cosine_ops)</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center px-2">
+              <div className="flex h-full flex-col items-center justify-center gap-2">
+                <div className="hidden h-full w-px bg-line md:block" />
+                <span className="rounded-md border border-line bg-surface-50 px-2.5 py-1 font-mono text-2xs whitespace-nowrap text-surface-600">
+                  RRF · k=60
+                </span>
+                <div className="hidden h-full w-px bg-line md:block" />
+              </div>
+            </div>
+
+            <div className="panel p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <FileSearch
+                  className="h-4 w-4 text-surface-400"
+                  strokeWidth={1.75}
+                />
+                <h3 className="text-sm font-semibold text-surface-900">
+                  Lexical arm
+                </h3>
+              </div>
+              <p className="text-sm leading-relaxed text-surface-500">
+                PostgreSQL full-text search over a generated tsvector column,
+                served by a GIN index. Finds the exact term you typed, even when
+                the embedding blurs it.
+              </p>
+              <div className="mt-4 space-y-1 border-t border-line pt-3 font-mono text-2xs text-surface-400">
+                <p>searchVector @@ websearch_to_tsquery(...)</p>
+                <p>USING gin (&quot;searchVector&quot;)</p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                icon: FileText,
-                title: "Smart Document Upload",
-                description:
-                  "Upload PDFs and let our AI parse, chunk, and vectorize your content for instant semantic search.",
-                gradient: "from-blue-500/20 to-cyan-500/20",
-                iconColor: "text-blue-400",
-              },
-              {
-                icon: MessageSquare,
-                title: "RAG-Powered Chat",
-                description:
-                  "Ask questions about your documents and get accurate, context-aware answers with source citations.",
-                gradient: "from-arcus-500/20 to-purple-500/20",
-                iconColor: "text-arcus-400",
-              },
-              {
-                icon: BookOpen,
-                title: "Auto Flashcards",
-                description:
-                  "Generate flashcard decks from your materials with one click. Study smarter with spaced repetition.",
-                gradient: "from-emerald-500/20 to-teal-500/20",
-                iconColor: "text-emerald-400",
-              },
-              {
-                icon: Brain,
-                title: "Quiz Generation",
-                description:
-                  "AI creates multiple-choice quizzes from your content to test your understanding and identify gaps.",
-                gradient: "from-amber-500/20 to-orange-500/20",
-                iconColor: "text-amber-400",
-              },
-              {
-                icon: Calendar,
-                title: "Study Planner",
-                description:
-                  "Extract dates and deadlines from syllabi. Auto-populate your Google Calendar with study schedules.",
-                gradient: "from-rose-500/20 to-pink-500/20",
-                iconColor: "text-rose-400",
-              },
-              {
-                icon: Zap,
-                title: "Lightning Fast",
-                description:
-                  "Built on pgvector for blazing-fast semantic search. Get answers in milliseconds, not seconds.",
-                gradient: "from-yellow-500/20 to-amber-500/20",
-                iconColor: "text-yellow-400",
-              },
-            ].map((feature) => (
-              <div
-                key={feature.title}
-                className="glass group cursor-pointer rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-white/15"
-              >
-                <div
-                  className={`mb-5 inline-flex rounded-xl bg-gradient-to-br ${feature.gradient} p-3`}
-                >
-                  <feature.icon className={`h-6 w-6 ${feature.iconColor}`} />
-                </div>
-                <h3 className="mb-3 text-lg font-semibold text-white">
-                  {feature.title}
+          <div className="panel mt-4 p-5">
+            <p className="font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase">
+              Fusion
+            </p>
+            <p className="mt-3 font-mono text-sm text-surface-800">
+              score(d) = Σ<sub className="text-surface-400">arms</sub> weight ÷
+              (k + rank<sub className="text-surface-400">arm</sub>(d))
+            </p>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-surface-500">
+              Cosine similarity and <code className="font-mono">ts_rank_cd</code>{" "}
+              live on incomparable scales, so blending their scores needs
+              constant recalibration. Rank position doesn&apos;t — which is why
+              RRF stays honest as the corpus grows. A passage both arms rank
+              moderately well beats one that a single arm ranks first.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pipeline ── */}
+      <section id="pipeline" className="border-b border-line bg-surface-50">
+        <div className="mx-auto max-w-[1080px] px-6 py-20">
+          <p className="mb-3 font-mono text-2xs tracking-[0.14em] text-surface-400 uppercase">
+            Ingestion
+          </p>
+          <h2 className="max-w-2xl text-3xl text-surface-900">
+            A pipeline you can inspect
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-surface-500">
+            Upload triggers a durable background job: fetch, parse, chunk,
+            validate, embed, upsert. Every stage is measured, and every failure
+            is either retried or explained.
+          </p>
+
+          <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-line bg-line md:grid-cols-3">
+            {guarantees.map((item) => (
+              <div key={item.title} className="bg-surface-0 p-5">
+                <item.icon
+                  className="mb-3 h-4 w-4 text-surface-400"
+                  strokeWidth={1.75}
+                />
+                <h3 className="text-sm font-semibold text-surface-900">
+                  {item.title}
                 </h3>
-                <p className="leading-relaxed text-surface-400">
-                  {feature.description}
+                <p className="mt-2 text-sm leading-relaxed text-surface-500">
+                  {item.body}
                 </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* ── How It Works ── */}
-      <section id="how-it-works" className="relative px-6 py-32">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-20 text-center">
-            <p className="mb-3 text-sm font-semibold tracking-widest text-arcus-400 uppercase">
-              How It Works
-            </p>
-            <h2 className="mb-4 text-4xl font-bold md:text-5xl">
-              Three Steps to{" "}
-              <span className="bg-gradient-to-r from-arcus-400 to-blue-400 bg-clip-text text-transparent">
-                Smarter Learning
-              </span>
-            </h2>
-          </div>
-
-          <div className="space-y-12">
+          {/* Step trace */}
+          <div className="panel mt-4 divide-y divide-line">
             {[
-              {
-                step: "01",
-                title: "Upload Your Documents",
-                description:
-                  "Drop your PDFs — lecture notes, textbooks, research papers. Arcus parses and understands them instantly.",
-                icon: Layers,
-              },
-              {
-                step: "02",
-                title: "Ask Anything",
-                description:
-                  "Chat with your documents using natural language. Get precise answers with references to the exact page and section.",
-                icon: MessageSquare,
-              },
-              {
-                step: "03",
-                title: "Study & Review",
-                description:
-                  "Generate flashcards and quizzes from your materials. Schedule study sessions that sync to your calendar.",
-                icon: GraduationCap,
-              },
-            ].map((item, i) => (
-              <div
-                key={item.step}
-                className="glass flex items-start gap-8 rounded-2xl p-8 transition-all hover:border-white/15"
-              >
-                <div className="flex-shrink-0">
-                  <span className="text-5xl font-black text-arcus-500/30">
-                    {item.step}
-                  </span>
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center gap-3">
-                    <item.icon className="h-5 w-5 text-arcus-400" />
-                    <h3 className="text-xl font-bold text-white">
-                      {item.title}
-                    </h3>
-                  </div>
-                  <p className="leading-relaxed text-surface-400">
-                    {item.description}
+              ["01", "fetch-and-chunk", "Parse the PDF, split it, normalise whitespace, hash each chunk, and validate against a zod schema. Malformed fragments are rejected individually and counted."],
+              ["02", "embed-and-store", "Each batch is embedded and written inside a single step, so vectors never cross a step boundary. Writes are ON CONFLICT DO NOTHING."],
+              ["03", "finalize", "Count what actually landed, then close the run with latency, yield, dedupe count, and token spend."],
+            ].map(([number, step, detail]) => (
+              <div key={step} className="flex gap-4 p-4">
+                <span className="font-mono text-2xs text-surface-300">
+                  {number}
+                </span>
+                <div className="min-w-0">
+                  <code className="font-mono text-sm text-surface-900">
+                    {step}
+                  </code>
+                  <p className="mt-1 text-sm leading-relaxed text-surface-500">
+                    {detail}
                   </p>
                 </div>
               </div>
@@ -278,77 +302,91 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Tech Stack ── */}
-      <section id="tech" className="relative px-6 py-32">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-16 text-center">
-            <p className="mb-3 text-sm font-semibold tracking-widest text-arcus-400 uppercase">
-              Technology
-            </p>
-            <h2 className="mb-4 text-4xl font-bold md:text-5xl">
-              Built With the{" "}
-              <span className="bg-gradient-to-r from-arcus-400 to-emerald-400 bg-clip-text text-transparent">
-                Best Stack
-              </span>
-            </h2>
-          </div>
+      {/* ── Capabilities ── */}
+      <section className="border-b border-line">
+        <div className="mx-auto max-w-[1080px] px-6 py-20">
+          <p className="mb-3 font-mono text-2xs tracking-[0.14em] text-surface-400 uppercase">
+            Workspace
+          </p>
+          <h2 className="max-w-2xl text-3xl text-surface-900">
+            What you can do with an indexed document
+          </h2>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {[
-              { name: "Next.js", desc: "React Framework" },
-              { name: "tRPC", desc: "Type-Safe APIs" },
-              { name: "Prisma", desc: "Database ORM" },
-              { name: "pgvector", desc: "Vector Search" },
-              { name: "LangChain", desc: "AI Pipeline" },
-              { name: "Tailwind", desc: "Styling" },
-              { name: "PostgreSQL", desc: "Database" },
-              { name: "TypeScript", desc: "Type Safety" },
-            ].map((tech) => (
-              <div
-                key={tech.name}
-                className="glass rounded-xl p-5 text-center transition-all hover:-translate-y-0.5 hover:border-white/15"
-              >
-                <p className="font-semibold text-white">{tech.name}</p>
-                <p className="mt-1 text-xs text-surface-500">{tech.desc}</p>
+          <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2">
+            {capabilities.map((item) => (
+              <div key={item.title} className="bg-surface-0 p-6">
+                <item.icon
+                  className="mb-3 h-4 w-4 text-surface-400"
+                  strokeWidth={1.75}
+                />
+                <h3 className="text-sm font-semibold text-surface-900">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-surface-500">
+                  {item.body}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA Section ── */}
-      <section className="relative px-6 py-32">
-        <div className="glow-purple mx-auto max-w-3xl rounded-3xl bg-gradient-to-br from-arcus-600/20 to-purple-600/20 p-16 text-center">
-          <Sparkles className="mx-auto mb-6 h-10 w-10 text-arcus-400" />
-          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Ready to Transform Your Study Sessions?
-          </h2>
-          <p className="mx-auto mb-8 max-w-xl text-surface-400">
-            Join the future of academic learning. Upload your first document and
-            experience the power of AI-assisted study.
+      {/* ── Stack ── */}
+      <section id="stack" className="border-b border-line">
+        <div className="mx-auto max-w-[1080px] px-6 py-20">
+          <p className="mb-3 font-mono text-2xs tracking-[0.14em] text-surface-400 uppercase">
+            Stack
           </p>
+          <h2 className="text-3xl text-surface-900">Built on</h2>
+
+          <dl className="mt-10 max-w-2xl">
+            {stack.map(([label, value]) => (
+              <div
+                key={label}
+                className="flex flex-col gap-1 border-b border-line py-3 sm:flex-row sm:items-baseline sm:gap-6"
+              >
+                <dt className="w-36 shrink-0 font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase">
+                  {label}
+                </dt>
+                <dd className="text-sm text-surface-700">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* ── Close ── */}
+      <section>
+        <div className="mx-auto max-w-[1080px] px-6 py-20">
+          <h2 className="max-w-xl text-3xl text-surface-900">
+            Upload a PDF and ask it something.
+          </h2>
           <Link
             href="/dashboard"
-            className="group inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-arcus-600 to-arcus-500 px-10 py-4 text-lg font-semibold text-white shadow-2xl shadow-arcus-600/20 transition-all hover:-translate-y-0.5 hover:shadow-arcus-600/30"
+            className="mt-7 inline-flex h-11 items-center gap-2 rounded-md bg-surface-900 px-5 text-base font-medium text-white transition-colors hover:bg-surface-800"
           >
-            Launch Arcus
-            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+            Open workspace
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-white/5 px-6 py-12">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 md:flex-row">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-arcus-500 to-arcus-700 text-sm font-bold text-white">
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-[1080px] flex-wrap items-center justify-between gap-4 px-6 py-7">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-6 w-6 items-center justify-center rounded bg-surface-900 font-mono text-2xs font-bold text-white">
               A
-            </div>
-            <span className="font-semibold">Arcus</span>
+            </span>
+            <span className="font-mono text-2xs text-surface-400">
+              Arcus — academic retrieval workspace
+            </span>
           </div>
-          <p className="text-sm text-surface-500">
-            © 2026 Arcus. Built with ❤️ for learners.
-          </p>
+          <Link
+            href="/dashboard"
+            className="font-mono text-2xs text-surface-400 transition-colors hover:text-surface-900"
+          >
+            Open workspace →
+          </Link>
         </div>
       </footer>
     </div>

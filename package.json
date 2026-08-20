@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "prisma migrate deploy && npm run db:verify",
+    "db:verify": "node scripts/db-objects.mjs verify",
+    "db:repair": "node scripts/db-objects.mjs repair",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.108",

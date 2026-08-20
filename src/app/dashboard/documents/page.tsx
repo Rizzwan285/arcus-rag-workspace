@@ -1,68 +1,45 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
-  Upload,
-  FileText,
-  MoreVertical,
-  Trash2,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  Search,
-  X,
-  File,
-  Layers,
   BookOpen,
-  RefreshCw,
-  Zap,
-  Target,
-  HelpCircle,
+  Brain,
+  ChevronDown,
+  Ellipsis,
+  FileText,
+  RotateCcw,
+  Search,
+  Trash2,
+  TriangleAlert,
+  Upload,
+  X,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { cn } from "@/lib/utils";
 import { useUploadThing } from "@/lib/uploadthing";
+import {
+  Button,
+  EmptyState,
+  IndeterminateBar,
+  Metric,
+  Panel,
+  PageHeader,
+  ProgressBar,
+  SectionLabel,
+  Skeleton,
+  Status,
+  type StatusTone,
+} from "@/components/ui";
+import { cn, formatNumber, relativeTime } from "@/lib/utils";
 
-const statusConfig = {
-  PENDING: {
-    icon: Clock,
-    label: "Pending",
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-    border: "border-amber-200",
-    animate: false,
-    description: "Waiting to start processing",
-  },
-  PROCESSING: {
-    icon: Loader2,
-    label: "Processing",
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-    border: "border-blue-200",
-    animate: true,
-    description: "Extracting text & generating embeddings",
-  },
-  COMPLETED: {
-    icon: CheckCircle,
-    label: "Ready",
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
-    border: "border-emerald-200",
-    animate: false,
-    description: "Searchable — ready for AI chat",
-  },
-  FAILED: {
-    icon: AlertCircle,
-    label: "Failed",
-    color: "text-red-600",
-    bg: "bg-red-50",
-    border: "border-red-200",
-    animate: false,
-    description: "Processing error occurred",
-  },
+type DocStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+const STATUS: Record<DocStatus, { tone: StatusTone; label: string }> = {
+  PENDING: { tone: "warn", label: "queued" },
+  PROCESSING: { tone: "busy", label: "processing" },
+  COMPLETED: { tone: "ok", label: "indexed" },
+  FAILED: { tone: "err", label: "failed" },
 };
 
 interface UploadingFile {
@@ -74,16 +51,120 @@ interface UploadingFile {
 export default function DocumentsPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const utils = trpc.useUtils();
+
   const [isDragging, setIsDragging] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [generatingModuleId, setGeneratingModuleId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle study module generation
-  const handleGenerateModule = async (documentId: string, type: "flashcards" | "quiz") => {
-    setGeneratingModuleId(documentId);
+  const {
+    data: documents = [],
+    refetch,
+    isLoading,
+  } = trpc.document.getAll.useQuery(undefined, {
+    enabled: !!session?.user,
+    // Poll while anything is in flight so status transitions land on their own.
+    refetchInterval: (q) => {
+      const docs = q.state.data;
+      if (!docs) return false;
+      return docs.some((d) => d.status === "PROCESSING" || d.status === "PENDING")
+        ? 3000
+        : false;
+    },
+  });
+
+  const invalidateAll = useCallback(() => {
+    void refetch();
+    void utils.document.getStats.invalidate();
+    void utils.document.getPipelineStats.invalidate();
+    void utils.document.getRecentRuns.invalidate();
+    void utils.document.getFailed.invalidate();
+  }, [refetch, utils]);
+
+  const deleteDocument = trpc.document.delete.useMutation({
+    onSettled: () => {
+      setBusyId(null);
+      invalidateAll();
+    },
+  });
+
+  const retryIngestion = trpc.document.retryIngestion.useMutation({
+    onError: (err) => setError(err.message),
+    onSettled: () => {
+      setBusyId(null);
+      invalidateAll();
+    },
+  });
+
+  const { startUpload } = useUploadThing("pdfUploader", {
+    onClientUploadComplete: () => {
+      setUploadingFiles((prev) =>
+        prev.map((f) => ({ ...f, progress: 100, status: "done" as const }))
+      );
+      invalidateAll();
+      setTimeout(() => setUploadingFiles([]), 1800);
+    },
+    onUploadError: (uploadError) => {
+      setError(uploadError.message);
+      setUploadingFiles((prev) =>
+        prev.map((f) => ({ ...f, status: "error" as const }))
+      );
+      setTimeout(() => setUploadingFiles([]), 4000);
+    },
+    onUploadProgress: (progress) => {
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.status === "uploading" ? { ...f, progress } : f))
+      );
+    },
+  });
+
+  // Dismiss the row menu on an outside click.
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpenId(null);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [menuOpenId]);
+
+  const handleFileUpload = useCallback(
+    async (files: File[]) => {
+      if (!session?.user) {
+        router.push("/auth/signin");
+        return;
+      }
+      const pdfs = files.filter(
+        (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
+      );
+      if (pdfs.length === 0) {
+        setError("Only PDF files can be ingested.");
+        return;
+      }
+      setError(null);
+      setUploadingFiles(
+        pdfs.map((f) => ({ name: f.name, progress: 0, status: "uploading" }))
+      );
+      await startUpload(pdfs);
+    },
+    [session, router, startUpload]
+  );
+
+  const handleGenerate = async (
+    documentId: string,
+    type: "flashcards" | "quiz"
+  ) => {
+    setBusyId(documentId);
     setMenuOpenId(null);
+    setError(null);
     try {
       const res = await fetch("/api/generate/study-module", {
         method: "POST",
@@ -92,482 +173,477 @@ export default function DocumentsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (type === "flashcards") {
-          router.push(`/dashboard/flashcards/${data.deckId}`);
-        } else {
-          router.push(`/dashboard/quizzes/${data.quizId}`);
-        }
+        router.push(
+          type === "flashcards"
+            ? `/dashboard/flashcards/${data.deckId}`
+            : `/dashboard/quizzes/${data.quizId}`
+        );
       } else {
-        console.error("Generation failed:", data.error);
-        alert(data.error || "Failed to generate module");
+        setError(data.error ?? "Generation failed.");
       }
-    } catch (error) {
-      console.error("Failed to generate module:", error);
-      alert("An error occurred while generating.");
+    } catch {
+      setError("An error occurred while generating.");
     } finally {
-      setGeneratingModuleId(null);
+      setBusyId(null);
     }
   };
 
-  // tRPC queries & mutations
-  const {
-    data: documents = [],
-    refetch,
-    isLoading,
-  } = trpc.document.getAll.useQuery(undefined, {
-    enabled: !!session?.user,
-    // Auto-poll every 3s if any documents are still processing
-    refetchInterval: (query) => {
-      const docs = query.state.data;
-      if (!docs) return false;
-      const hasProcessing = docs.some(
-        (d) => d.status === "PROCESSING" || d.status === "PENDING"
-      );
-      return hasProcessing ? 3000 : false;
-    },
-  });
-
-  const deleteDocument = trpc.document.delete.useMutation({
-    onSuccess: () => refetch(),
-  });
-
-  // UploadThing integration
-  const { startUpload, isUploading } = useUploadThing("pdfUploader", {
-    onClientUploadComplete: (res) => {
-      console.log("Upload complete:", res);
-      // Mark all uploading files as done
-      setUploadingFiles((prev) =>
-        prev.map((f) => ({ ...f, progress: 100, status: "done" as const }))
-      );
-      // Refetch documents to show the new ones
-      refetch();
-      // Clear upload state after a delay
-      setTimeout(() => setUploadingFiles([]), 2000);
-    },
-    onUploadError: (error) => {
-      console.error("Upload error:", error);
-      setUploadingFiles((prev) =>
-        prev.map((f) => ({ ...f, status: "error" as const }))
-      );
-      setTimeout(() => setUploadingFiles([]), 4000);
-    },
-    onUploadProgress: (progress) => {
-      setUploadingFiles((prev) =>
-        prev.map((f) =>
-          f.status === "uploading" ? { ...f, progress } : f
-        )
-      );
-    },
-  });
-
-  const handleFileUpload = useCallback(
-    async (files: File[]) => {
-      if (!session?.user) {
-        router.push("/auth/signin");
-        return;
-      }
-
-      const pdfFiles = files.filter(
-        (f) => f.type === "application/pdf" || f.name.endsWith(".pdf")
-      );
-      if (pdfFiles.length === 0) return;
-
-      // Show uploading state
-      setUploadingFiles(
-        pdfFiles.map((f) => ({ name: f.name, progress: 0, status: "uploading" }))
-      );
-
-      // Upload via UploadThing (this triggers onUploadComplete on the server)
-      await startUpload(pdfFiles);
-    },
-    [session, router, startUpload]
+  const filtered = documents.filter((doc) =>
+    doc.title.toLowerCase().includes(query.toLowerCase())
   );
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    handleFileUpload(files);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    handleFileUpload(files);
-    e.target.value = ""; // Reset input
-  };
-
-  const filteredDocuments = documents.filter((doc) =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const completedCount = documents.filter((d) => d.status === "COMPLETED").length;
-  const processingCount = documents.filter(
+  const readyCount = documents.filter((d) => d.status === "COMPLETED").length;
+  const inFlight = documents.filter(
     (d) => d.status === "PROCESSING" || d.status === "PENDING"
   ).length;
-  const totalChunks = documents.reduce(
-    (sum, d) => sum + (d._count?.chunks ?? 0),
-    0
-  );
+  const failedCount = documents.filter((d) => d.status === "FAILED").length;
+  const totalChunks = documents.reduce((sum, d) => sum + (d._count?.chunks ?? 0), 0);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div className="animate-fade-in flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-surface-900">
-            Documents
-          </h1>
-          <p className="mt-1 text-surface-500">
-            Upload and manage your course materials
-          </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Documents"
+        description="PDFs are parsed, chunked, embedded, and indexed for hybrid retrieval. Chunk writes are keyed on a content hash, so a retry can never duplicate your corpus."
+        action={
+          <Button
+            variant="solid"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Upload PDF
+          </Button>
+        }
+      />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = event.target.files ? Array.from(event.target.files) : [];
+          void handleFileUpload(files);
+          event.target.value = "";
+        }}
+      />
+
+      {error && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-err-soft px-3.5 py-2.5">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-err" />
+          <p className="flex-1 text-xs text-surface-700">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-surface-400 hover:text-surface-700"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
+      )}
 
-        {/* Stats Summary */}
-        {documents.length > 0 && (
-          <div className="hidden gap-3 sm:flex">
-            <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium">
-              <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
-              <span className="text-emerald-700">
-                {completedCount} ready
-              </span>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium">
-              <Layers className="h-3.5 w-3.5 text-blue-600" />
-              <span className="text-blue-700">
-                {totalChunks} chunks
-              </span>
-            </div>
-            {processingCount > 0 && (
-              <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium">
-                <Zap className="h-3.5 w-3.5 text-amber-600" />
-                <span className="text-amber-700">
-                  {processingCount} processing
-                </span>
-              </div>
-            )}
+      {/* ── Corpus summary ── */}
+      {documents.length > 0 && (
+        <Panel className="grid grid-cols-2 divide-line md:grid-cols-4 md:divide-x">
+          <div className="border-b border-line p-4 md:border-b-0">
+            <Metric label="Documents" value={documents.length} />
           </div>
-        )}
-      </div>
+          <div className="border-b border-line p-4 md:border-b-0">
+            <Metric
+              label="Indexed"
+              value={readyCount}
+              tone={readyCount > 0 ? "ok" : "idle"}
+            />
+          </div>
+          <div className="p-4">
+            <Metric
+              label="In flight"
+              value={inFlight}
+              tone={inFlight > 0 ? "busy" : "idle"}
+            />
+          </div>
+          <div className="p-4">
+            <Metric
+              label="Chunks"
+              value={formatNumber(totalChunks)}
+              hint={failedCount > 0 ? `${failedCount} failed` : "Retrievable"}
+            />
+          </div>
+        </Panel>
+      )}
 
-      {/* ── Upload Zone ── */}
+      {/* ── Drop zone ── */}
       <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+          void handleFileUpload(Array.from(event.dataTransfer.files));
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         className={cn(
-          "relative cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all duration-300",
+          "flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-6 py-10 text-center transition-colors",
           isDragging
-            ? "border-arcus-500 bg-arcus-50/50 shadow-lg shadow-arcus-500/10"
-            : "border-surface-300 bg-white hover:border-arcus-400 hover:bg-arcus-50/20",
-          isUploading && "pointer-events-none opacity-60"
+            ? "border-arcus-500 bg-arcus-50"
+            : "border-line-strong hover:border-surface-400 hover:bg-surface-50"
         )}
       >
-        <label htmlFor="file-upload" className="cursor-pointer">
-          <input
-            id="file-upload"
-            type="file"
-            multiple
-            accept=".pdf"
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={isUploading}
-          />
-          <div
-            className={cn(
-              "mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl transition-colors",
-              isDragging
-                ? "bg-arcus-100 text-arcus-600"
-                : "bg-surface-100 text-surface-400"
-            )}
-          >
-            {isUploading ? (
-              <Loader2 className="h-8 w-8 animate-spin" />
-            ) : (
-              <Upload className="h-8 w-8" />
-            )}
-          </div>
-          <p className="text-lg font-semibold text-surface-900">
-            {isDragging
-              ? "Drop your files here"
-              : isUploading
-              ? "Uploading..."
-              : "Upload Documents"}
-          </p>
-          <p className="mt-1 text-sm text-surface-500">
-            {isUploading
-              ? "Your files are being uploaded and will be processed automatically"
-              : "Drag & drop PDF files or click to browse"}
-          </p>
-          <p className="mt-3 text-xs text-surface-400">
-            Supported: PDF • Max 32MB per file • Up to 5 files
-          </p>
-        </label>
+        <div className="hatch mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-line">
+          <Upload className="h-4 w-4 text-surface-400" strokeWidth={1.75} />
+        </div>
+        <p className="text-sm font-medium text-surface-800">
+          {isDragging ? "Release to upload" : "Drop PDFs here"}
+        </p>
+        <p className="mt-1 font-mono text-2xs text-surface-400">
+          PDF · up to 32 MB · 5 files per upload
+        </p>
       </div>
 
-      {/* ── Uploading Files ── */}
+      {/* ── In-progress uploads ── */}
       {uploadingFiles.length > 0 && (
-        <div className="space-y-2">
-          {uploadingFiles.map((file, idx) => (
-            <div
-              key={idx}
-              className="flex items-center gap-3 rounded-xl border border-surface-200 bg-white p-4"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-500">
-                <File className="h-5 w-5" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-surface-900">
+        <Panel className="divide-y divide-line">
+          {uploadingFiles.map((file) => (
+            <div key={file.name} className="px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate text-sm text-surface-800">
                   {file.name}
-                </p>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      file.status === "error"
-                        ? "bg-red-500"
-                        : file.status === "done"
-                        ? "bg-emerald-500"
-                        : "bg-arcus-500"
-                    )}
-                    style={{ width: `${file.progress}%` }}
-                  />
-                </div>
+                </span>
+                <span className="shrink-0 font-mono text-2xs tabular text-surface-400">
+                  {file.status === "error"
+                    ? "failed"
+                    : file.status === "done"
+                      ? "queued for ingest"
+                      : `${Math.round(file.progress)}%`}
+                </span>
               </div>
-              {file.status === "uploading" && (
-                <Loader2 className="h-4 w-4 animate-spin text-arcus-500" />
-              )}
-              {file.status === "done" && (
-                <CheckCircle className="h-4 w-4 text-emerald-500" />
-              )}
-              {file.status === "error" && (
-                <AlertCircle className="h-4 w-4 text-red-500" />
-              )}
+              <ProgressBar value={file.progress} className="mt-2" />
             </div>
           ))}
-        </div>
+        </Panel>
       )}
 
-      {/* ── Processing Banner ── */}
-      {processingCount > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3">
-          <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-          <p className="text-sm font-medium text-blue-800">
-            {processingCount} document{processingCount > 1 ? "s" : ""} being
-            processed — extracting text and generating embeddings...
-          </p>
-          <RefreshCw className="ml-auto h-4 w-4 text-blue-400 animate-pulse" />
-        </div>
-      )}
+      {/* ── Library ── */}
+      <section className="space-y-3">
+        <SectionLabel
+          action={
+            documents.length > 0 ? (
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-surface-400" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Filter by title"
+                  className="h-8 w-56 rounded-md border border-line bg-surface-0 pr-2.5 pl-8 text-sm text-surface-900 placeholder:text-surface-400 focus:border-surface-400 focus:outline-none"
+                />
+              </div>
+            ) : undefined
+          }
+        >
+          Library
+        </SectionLabel>
 
-      {/* ── Search ── */}
-      {documents.length > 0 && (
-        <div className="relative">
-          <Search className="absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-surface-400" />
-          <input
-            type="text"
-            placeholder="Search documents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-surface-200 bg-white py-3 pr-4 pl-11 text-sm text-surface-900 placeholder:text-surface-400 focus:border-arcus-500 focus:ring-2 focus:ring-arcus-500/20 focus:outline-none"
+        {isLoading ? (
+          <Panel className="divide-y divide-line">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-2 px-4 py-3.5">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+            ))}
+          </Panel>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title={query ? "No matches" : "No documents yet"}
+            description={
+              query
+                ? `Nothing matches “${query}”.`
+                : "Upload a PDF to build your searchable corpus."
+            }
+            action={
+              query ? (
+                <Button variant="outline" size="sm" onClick={() => setQuery("")}>
+                  Clear filter
+                </Button>
+              ) : (
+                <Button
+                  variant="solid"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload a PDF
+                </Button>
+              )
+            }
           />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute top-1/2 right-4 -translate-y-1/2 text-surface-400 hover:text-surface-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      )}
+        ) : (
+          <Panel className="divide-y divide-line">
+            {filtered.map((doc) => {
+              const status = STATUS[doc.status as DocStatus];
+              const isFailed = doc.status === "FAILED";
+              const isBusy =
+                doc.status === "PROCESSING" || doc.status === "PENDING";
+              const isExpanded = expandedId === doc.id;
 
-      {/* ── Document List ── */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
-        </div>
-      ) : filteredDocuments.length === 0 ? (
-        <div className="card p-16 text-center">
-          <FileText className="mx-auto mb-4 h-12 w-12 text-surface-300" />
-          <h3 className="text-lg font-semibold text-surface-900">
-            {documents.length === 0
-              ? "No documents yet"
-              : "No matching documents"}
-          </h3>
-          <p className="mt-1 text-sm text-surface-500">
-            {documents.length === 0
-              ? "Upload your first PDF to get started with AI-powered learning"
-              : "Try a different search term"}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredDocuments.map((doc) => {
-            const status =
-              statusConfig[doc.status as keyof typeof statusConfig];
-            const StatusIcon = status.icon;
-            const chunkCount = doc._count?.chunks ?? 0;
+              return (
+                <div key={doc.id} className="group">
+                  <div className="flex items-start gap-3 px-4 py-3.5">
+                    <FileText
+                      className={cn(
+                        "mt-0.5 h-4 w-4 shrink-0",
+                        isFailed ? "text-err" : "text-surface-300"
+                      )}
+                      strokeWidth={1.75}
+                    />
 
-            return (
-              <div
-                key={doc.id}
-                className={cn(
-                  "card group flex items-center gap-4 p-4",
-                  doc.status === "PROCESSING"
-                    ? "border-blue-200 bg-blue-50/30"
-                    : doc.status === "FAILED"
-                    ? "border-red-200 bg-red-50/20"
-                    : "border-surface-200 hover:border-surface-300"
-                )}
-              >
-                <div
-                  className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-lg",
-                    doc.status === "COMPLETED"
-                      ? "bg-emerald-50 text-emerald-500"
-                      : doc.status === "PROCESSING"
-                      ? "bg-blue-50 text-blue-500"
-                      : doc.status === "FAILED"
-                      ? "bg-red-50 text-red-500"
-                      : "bg-surface-100 text-surface-400"
-                  )}
-                >
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-surface-900 truncate">
-                    {doc.title}
-                  </p>
-                  <p className="text-xs text-surface-500">
-                    {doc.status === "COMPLETED" && (
-                      <>
-                        {chunkCount} chunks
-                        {doc.pageCount && ` • ${doc.pageCount} pages`}
-                        {" • "}
-                      </>
-                    )}
-                    {doc.status === "PROCESSING" && (
-                      <span className="text-blue-600">
-                        Processing — extracting text & embeddings...
-                      </span>
-                    )}
-                    {doc.status === "FAILED" && (
-                      <span className="text-red-600">
-                        Processing failed — try re-uploading
-                      </span>
-                    )}
-                    {(doc.status === "COMPLETED" || doc.status === "PENDING") && (
-                      <>
-                        Uploaded{" "}
-                        {new Date(doc.createdAt).toLocaleDateString()}
-                      </>
-                    )}
-                  </p>
-                </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-surface-900">
+                        {doc.title}
+                      </p>
 
-                {/* Status Badge */}
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
-                    status.bg,
-                    status.color
-                  )}
-                  title={status.description}
-                >
-                  <StatusIcon
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      status.animate && "animate-spin"
-                    )}
-                  />
-                  {status.label}
-                </div>
-
-                {/* Actions Menu */}
-                <div className="relative">
-                  <button
-                    onClick={() =>
-                      setMenuOpenId(menuOpenId === doc.id ? null : doc.id)
-                    }
-                    className="rounded-lg p-2 text-surface-400 opacity-0 transition-all hover:bg-surface-100 group-hover:opacity-100"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                  {menuOpenId === doc.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setMenuOpenId(null)}
-                      />
-                      <div className="absolute right-0 z-50 mt-1 w-48 overflow-hidden rounded-lg border border-surface-200 bg-white shadow-lg">
-                        {doc.status === "COMPLETED" && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Status tone={status.tone}>{status.label}</Status>
+                        <span className="text-surface-300">·</span>
+                        <span className="font-mono text-2xs tabular text-surface-400">
+                          {doc._count.chunks} chunks
+                        </span>
+                        {doc.pageCount ? (
                           <>
-                            <button
-                              onClick={() => {
-                                router.push(
-                                  `/dashboard/chat?q=${encodeURIComponent(
-                                    `Create a detailed study plan with review sessions based on the document "${doc.title}".`
-                                  )}`
-                                );
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-surface-600 hover:bg-arcus-50 hover:text-arcus-700"
-                            >
-                              <Target className="h-4 w-4" />
-                              Generate Study Plan
-                            </button>
-                            <button
-                              onClick={() => handleGenerateModule(doc.id, "flashcards")}
-                              disabled={generatingModuleId === doc.id}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-surface-600 hover:bg-arcus-50 hover:text-arcus-700 disabled:opacity-50"
-                            >
-                              {generatingModuleId === doc.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <BookOpen className="h-4 w-4" />
-                              )}
-                              Generate Flashcards
-                            </button>
-                            <button
-                              onClick={() => handleGenerateModule(doc.id, "quiz")}
-                              disabled={generatingModuleId === doc.id}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-surface-600 hover:bg-arcus-50 hover:text-arcus-700 disabled:opacity-50"
-                            >
-                              {generatingModuleId === doc.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <HelpCircle className="h-4 w-4" />
-                              )}
-                              Generate Quiz
-                            </button>
+                            <span className="text-surface-300">·</span>
+                            <span className="font-mono text-2xs tabular text-surface-400">
+                              {doc.pageCount} pages
+                            </span>
+                          </>
+                        ) : null}
+                        <span className="text-surface-300">·</span>
+                        <span className="font-mono text-2xs text-surface-400">
+                          {relativeTime(doc.createdAt)}
+                        </span>
+                        {doc.failedStep && (
+                          <>
+                            <span className="text-surface-300">·</span>
+                            <span className="rounded border border-red-200 bg-err-soft px-1.5 py-0.5 font-mono text-2xs text-err">
+                              {doc.failedStep}
+                            </span>
                           </>
                         )}
-                        <button
-                          onClick={() => {
-                            deleteDocument.mutate({ id: doc.id });
-                            setMenuOpenId(null);
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </button>
                       </div>
-                    </>
-                  )}
+
+                      {isBusy && <IndeterminateBar className="mt-2.5 max-w-xs" />}
+
+                      {isFailed && doc.errorMessage && (
+                        <p className="mt-1.5 text-xs leading-relaxed text-surface-600">
+                          {doc.errorMessage}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {isFailed && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          loading={busyId === doc.id}
+                          onClick={() => {
+                            setBusyId(doc.id);
+                            retryIngestion.mutate({
+                              id: doc.id,
+                              purgeExistingChunks: false,
+                            });
+                          }}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          Retry
+                        </Button>
+                      )}
+
+                      {doc.status === "COMPLETED" && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            loading={busyId === doc.id}
+                            onClick={() => handleGenerate(doc.id, "flashcards")}
+                          >
+                            <BookOpen className="h-3 w-3" />
+                            Cards
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            loading={busyId === doc.id}
+                            onClick={() => handleGenerate(doc.id, "quiz")}
+                          >
+                            <Brain className="h-3 w-3" />
+                            Quiz
+                          </Button>
+                        </>
+                      )}
+
+                      <div className="relative" ref={menuOpenId === doc.id ? menuRef : undefined}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Actions for ${doc.title}`}
+                          aria-expanded={menuOpenId === doc.id}
+                          onClick={() =>
+                            setMenuOpenId(menuOpenId === doc.id ? null : doc.id)
+                          }
+                        >
+                          <Ellipsis className="h-3.5 w-3.5" />
+                        </Button>
+
+                        {menuOpenId === doc.id && (
+                          <div
+                            role="menu"
+                            className="absolute right-0 z-40 mt-1 w-52 overflow-hidden rounded-lg border border-line bg-surface-0 shadow-lg"
+                          >
+                            <button
+                              role="menuitem"
+                              onClick={() => {
+                                setMenuOpenId(null);
+                                setExpandedId(isExpanded ? null : doc.id);
+                              }}
+                              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                              {isExpanded ? "Hide run history" : "Run history"}
+                            </button>
+                            <button
+                              role="menuitem"
+                              onClick={() => {
+                                setMenuOpenId(null);
+                                setBusyId(doc.id);
+                                retryIngestion.mutate({
+                                  id: doc.id,
+                                  purgeExistingChunks: true,
+                                });
+                              }}
+                              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Reprocess from scratch
+                            </button>
+                            <button
+                              role="menuitem"
+                              onClick={() => {
+                                setMenuOpenId(null);
+                                setBusyId(doc.id);
+                                deleteDocument.mutate({ id: doc.id });
+                              }}
+                              className="flex w-full items-center gap-2.5 border-t border-line px-3 py-2 text-left text-sm text-err hover:bg-err-soft"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete document
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isExpanded && <RunHistory documentId={doc.id} />}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </Panel>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Per-document ingestion history. Loaded on demand so the library list stays
+ * one query.
+ */
+function RunHistory({ documentId }: { documentId: string }) {
+  const { data: runs, isLoading } = trpc.document.getIngestionRuns.useQuery({
+    documentId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="border-t border-line bg-surface-50 px-4 py-3">
+        <Skeleton className="h-3 w-1/3" />
+      </div>
+    );
+  }
+
+  if (!runs || runs.length === 0) {
+    return (
+      <div className="border-t border-line bg-surface-50 px-4 py-3">
+        <p className="text-xs text-surface-400">
+          No runs recorded — this document predates run telemetry.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-line bg-surface-50 px-4 py-3">
+      <table className="w-full text-left">
+        <thead>
+          <tr>
+            {["Attempt", "Status", "Latency", "Yielded", "Written", "Deduped", "Tokens", "When"].map(
+              (header) => (
+                <th
+                  key={header}
+                  className="pb-1.5 font-mono text-2xs font-medium tracking-[0.08em] text-surface-400 uppercase"
+                >
+                  {header}
+                </th>
+              )
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {runs.map((run) => (
+            <tr key={run.id} className="font-mono text-2xs tabular text-surface-600">
+              <td className="py-1">{run.attempt}</td>
+              <td className="py-1">
+                <Status
+                  tone={
+                    run.status === "SUCCEEDED"
+                      ? "ok"
+                      : run.status === "FAILED"
+                        ? "err"
+                        : "busy"
+                  }
+                >
+                  {run.status.toLowerCase()}
+                </Status>
+              </td>
+              <td className="py-1">
+                {run.latencyMs === null ? "—" : `${run.latencyMs}ms`}
+              </td>
+              <td className="py-1">{run.chunksYielded ?? "—"}</td>
+              <td className="py-1">{run.chunksInserted ?? "—"}</td>
+              <td className="py-1">{run.chunksDeduped ?? "—"}</td>
+              <td className="py-1">
+                {run.embeddingTokens ? formatNumber(run.embeddingTokens) : "—"}
+              </td>
+              <td className="py-1 text-surface-400">
+                {relativeTime(run.startedAt)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

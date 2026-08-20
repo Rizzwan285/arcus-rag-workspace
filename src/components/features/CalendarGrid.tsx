@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,20 +21,21 @@ interface CalendarGridProps {
   onMonthChange: (date: Date) => void;
 }
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
-const EVENT_DOT_COLORS: Record<string, string> = {
-  EXAM: "bg-red-500",
-  ASSIGNMENT: "bg-blue-500",
-  DEADLINE: "bg-amber-500",
-  LECTURE: "bg-purple-500",
-  STUDY_SESSION: "bg-emerald-500",
-  REVIEW: "bg-teal-500",
-  OTHER: "bg-surface-400",
+/** One colour per kind, drawn from the status palette rather than a rainbow. */
+export const EVENT_DOT: Record<string, string> = {
+  EXAM: "bg-err",
+  ASSIGNMENT: "bg-busy",
+  DEADLINE: "bg-warn",
+  LECTURE: "bg-surface-500",
+  STUDY_SESSION: "bg-ok",
+  REVIEW: "bg-surface-400",
+  OTHER: "bg-surface-300",
 };
 
 export default function CalendarGrid({
@@ -47,20 +48,16 @@ export default function CalendarGrid({
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
-  // Build calendar grid
   const calendarDays = useMemo(() => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startPadding = firstDay.getDay();
+    // Monday-first: JS weeks start on Sunday, so shift by one.
+    const startPadding = (firstDay.getDay() + 6) % 7;
     const daysInMonth = lastDay.getDate();
-
-    // Previous month's trailing days
     const prevMonthLastDay = new Date(year, month, 0).getDate();
-    const days: Array<{
-      date: Date;
-      isCurrentMonth: boolean;
-      isToday: boolean;
-    }> = [];
+
+    const days: Array<{ date: Date; isCurrentMonth: boolean; isToday: boolean }> = [];
+    const today = new Date();
 
     for (let i = startPadding - 1; i >= 0; i--) {
       days.push({
@@ -70,7 +67,6 @@ export default function CalendarGrid({
       });
     }
 
-    const today = new Date();
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
       days.push({
@@ -80,9 +76,7 @@ export default function CalendarGrid({
       });
     }
 
-    // Next month's leading days (fill to 6 rows)
-    const remaining = 42 - days.length;
-    for (let i = 1; i <= remaining; i++) {
+    for (let i = 1; days.length < 42; i++) {
       days.push({
         date: new Date(year, month + 1, i),
         isCurrentMonth: false,
@@ -93,7 +87,6 @@ export default function CalendarGrid({
     return days;
   }, [year, month]);
 
-  // Map events by date string
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const event of events) {
@@ -104,81 +97,82 @@ export default function CalendarGrid({
     return map;
   }, [events]);
 
-  const goToPrevMonth = () => onMonthChange(new Date(year, month - 1, 1));
-  const goToNextMonth = () => onMonthChange(new Date(year, month + 1, 1));
-  const goToToday = () => {
-    const today = new Date();
-    onMonthChange(new Date(today.getFullYear(), today.getMonth(), 1));
-    onSelectDate(today);
-  };
-
   return (
-    <div className="rounded-2xl border border-surface-200 bg-white shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-surface-200 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-surface-900">
-            {MONTHS[month]} {year}
+    <div className="panel overflow-hidden">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-sm font-semibold text-surface-900">
+            {MONTHS[month]}
           </h2>
+          <span className="font-mono text-xs tabular text-surface-400">
+            {year}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
           <button
-            onClick={goToToday}
-            className="rounded-lg bg-surface-100 px-3 py-1 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-200"
+            onClick={() => {
+              const today = new Date();
+              onMonthChange(new Date(today.getFullYear(), today.getMonth(), 1));
+              onSelectDate(today);
+            }}
+            className="rounded-md px-2 py-1 text-xs text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-900"
           >
             Today
           </button>
-        </div>
-        <div className="flex items-center gap-1">
           <button
-            onClick={goToPrevMonth}
-            className="rounded-lg p-2 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600"
+            onClick={() => onMonthChange(new Date(year, month - 1, 1))}
+            aria-label="Previous month"
+            className="rounded-md p-1.5 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-700"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <button
-            onClick={goToNextMonth}
-            className="rounded-lg p-2 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600"
+            onClick={() => onMonthChange(new Date(year, month + 1, 1))}
+            aria-label="Next month"
+            className="rounded-md p-1.5 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-700"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Day headers */}
-      <div className="grid grid-cols-7 border-b border-surface-100">
+      <div className="grid grid-cols-7 border-b border-line bg-surface-50">
         {DAYS.map((day) => (
           <div
             key={day}
-            className="py-2 text-center text-xs font-semibold uppercase tracking-wider text-surface-400"
+            className="py-1.5 text-center font-mono text-2xs tracking-[0.08em] text-surface-400 uppercase"
           >
             {day}
           </div>
         ))}
       </div>
 
-      {/* Calendar cells */}
       <div className="grid grid-cols-7">
         {calendarDays.map((day, index) => {
           const dateKey = day.date.toDateString();
-          const dayEvents = eventsByDate.get(dateKey) || [];
-          const isSelected =
-            selectedDate && selectedDate.toDateString() === dateKey;
+          const dayEvents = eventsByDate.get(dateKey) ?? [];
+          const isSelected = selectedDate?.toDateString() === dateKey;
 
           return (
             <button
               key={index}
               onClick={() => onSelectDate(day.date)}
+              aria-current={day.isToday ? "date" : undefined}
               className={cn(
-                "group relative flex h-[88px] flex-col border-b border-r border-surface-100 p-1.5 text-left transition-colors hover:bg-arcus-50/50",
-                !day.isCurrentMonth && "bg-surface-50/50",
-                isSelected && "bg-arcus-50 ring-1 ring-inset ring-arcus-300"
+                "relative flex h-[76px] flex-col items-start gap-1 border-r border-b border-line p-1.5 text-left transition-colors",
+                // Trim the outer edges so the grid reads as one block.
+                index % 7 === 6 && "border-r-0",
+                index >= 35 && "border-b-0",
+                !day.isCurrentMonth && "bg-surface-50",
+                isSelected ? "bg-surface-200/60" : "hover:bg-surface-50"
               )}
             >
-              {/* Day number */}
               <span
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                  "flex h-5 min-w-5 items-center justify-center rounded font-mono text-2xs tabular",
                   day.isToday
-                    ? "bg-arcus-600 text-white"
+                    ? "bg-surface-900 px-1 text-white"
                     : day.isCurrentMonth
                       ? "text-surface-700"
                       : "text-surface-300"
@@ -187,23 +181,23 @@ export default function CalendarGrid({
                 {day.date.getDate()}
               </span>
 
-              {/* Event dots */}
               {dayEvents.length > 0 && (
-                <div className="mt-auto flex flex-wrap gap-0.5">
-                  {dayEvents.slice(0, 3).map((event) => (
+                <div className="mt-auto flex w-full flex-wrap items-center gap-0.5">
+                  {dayEvents.slice(0, 4).map((event) => (
                     <span
                       key={event.id}
+                      title={event.title}
                       className={cn(
-                        "h-1.5 w-1.5 rounded-full",
+                        "h-1 w-1 rounded-full",
                         event.completed
                           ? "bg-surface-300"
-                          : EVENT_DOT_COLORS[event.eventType] || "bg-surface-400"
+                          : (EVENT_DOT[event.eventType] ?? "bg-surface-400")
                       )}
                     />
                   ))}
-                  {dayEvents.length > 3 && (
-                    <span className="text-[9px] font-medium text-surface-400">
-                      +{dayEvents.length - 3}
+                  {dayEvents.length > 4 && (
+                    <span className="font-mono text-2xs text-surface-400">
+                      +{dayEvents.length - 4}
                     </span>
                   )}
                 </div>

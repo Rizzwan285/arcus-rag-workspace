@@ -2,7 +2,7 @@ import { createUploadthing, type FileRouter } from "uploadthing/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
-import { inngest } from "@/inngest/client";
+import { documentIngestEvent, inngest } from "@/inngest/client";
 
 const f = createUploadthing();
 
@@ -19,7 +19,7 @@ export const ourFileRouter = {
    * - Triggers document ingestion pipeline on completion
    */
   pdfUploader: f({ pdf: { maxFileSize: "32MB", maxFileCount: 5 } })
-    .middleware(async ({ req }) => {
+    .middleware(async () => {
       const session = await getServerSession(authOptions);
 
       if (!session?.user?.id) {
@@ -44,16 +44,17 @@ export const ourFileRouter = {
         },
       });
 
-      // 2. Trigger the Inngest background job
-      // The pipeline will: fetch PDF → parse → chunk → embed → store
-      // Status updates: PENDING → PROCESSING → COMPLETED/FAILED
-      await inngest.send({
-        name: "document/ingest",
-        data: {
+      // 2. Trigger the Inngest background job.
+      // The pipeline will: fetch PDF → parse → chunk → validate → embed → upsert.
+      // Status updates: PENDING → PROCESSING → COMPLETED/FAILED (DLQ).
+      // `documentIngestEvent.create` type-checks the payload against the same
+      // zod schema the consumer validates it with.
+      await inngest.send(
+        documentIngestEvent.create({
           documentId: doc.id,
           fileUrl: file.ufsUrl,
-        },
-      });
+        }),
+      );
 
       // Return data to the client callback
       return { documentId: doc.id, fileUrl: file.ufsUrl };

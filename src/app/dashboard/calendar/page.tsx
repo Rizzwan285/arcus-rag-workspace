@@ -1,37 +1,39 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-  CalendarDays,
-  Plus,
-  ListTodo,
-  Target,
-  GraduationCap,
-  Clock,
-  TrendingUp,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
-import CalendarGrid from "@/components/features/CalendarGrid";
+import CalendarGrid, { EVENT_DOT } from "@/components/features/CalendarGrid";
 import EventCard from "@/components/features/EventCard";
+import {
+  Button,
+  Metric,
+  Panel,
+  PanelHeader,
+  PageHeader,
+  Skeleton,
+} from "@/components/ui";
 
-const EVENT_TYPE_OPTIONS = [
-  { value: "EXAM", label: "Exam", icon: GraduationCap },
-  { value: "ASSIGNMENT", label: "Assignment", icon: ListTodo },
-  { value: "DEADLINE", label: "Deadline", icon: Clock },
-  { value: "STUDY_SESSION", label: "Study Session", icon: Target },
-  { value: "REVIEW", label: "Review", icon: TrendingUp },
-  { value: "OTHER", label: "Other", icon: CalendarDays },
-];
+const EVENT_TYPES = [
+  { value: "EXAM", label: "Exam" },
+  { value: "ASSIGNMENT", label: "Assignment" },
+  { value: "DEADLINE", label: "Deadline" },
+  { value: "LECTURE", label: "Lecture" },
+  { value: "STUDY_SESSION", label: "Study" },
+  { value: "REVIEW", label: "Review" },
+  { value: "OTHER", label: "Other" },
+] as const;
 
-const PRIORITY_OPTIONS = [
-  { value: "LOW", label: "Low", color: "bg-surface-300" },
-  { value: "MEDIUM", label: "Medium", color: "bg-blue-400" },
-  { value: "HIGH", label: "High", color: "bg-amber-500" },
-  { value: "CRITICAL", label: "Critical", color: "bg-red-500" },
-];
+const PRIORITIES = [
+  { value: "LOW", label: "Low" },
+  { value: "MEDIUM", label: "Medium" },
+  { value: "HIGH", label: "High" },
+  { value: "CRITICAL", label: "Critical" },
+] as const;
+
+type EventType = (typeof EVENT_TYPES)[number]["value"];
+type Priority = (typeof PRIORITIES)[number]["value"];
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -39,434 +41,391 @@ export default function CalendarPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
-  // Form state for creating events
-  const [newEvent, setNewEvent] = useState({
+  const [form, setForm] = useState({
     title: "",
     description: "",
-    eventType: "STUDY_SESSION" as string,
+    eventType: "STUDY_SESSION" as EventType,
     date: new Date().toISOString().split("T")[0],
-    priority: "MEDIUM" as string,
+    priority: "MEDIUM" as Priority,
   });
 
   const utils = trpc.useUtils();
 
-  // Query events for the current month view (padded by a week on each side)
-  const startDate = useMemo(() => {
-    const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), -7);
-    return d.toISOString();
-  }, [currentMonth]);
-
-  const endDate = useMemo(() => {
-    const d = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth() + 1,
-      7
-    );
-    return d.toISOString();
-  }, [currentMonth]);
+  // Pad the window by a week either side so trailing/leading cells show dots.
+  const startDate = useMemo(
+    () => new Date(currentMonth.getFullYear(), currentMonth.getMonth(), -7).toISOString(),
+    [currentMonth]
+  );
+  const endDate = useMemo(
+    () => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 7).toISOString(),
+    [currentMonth]
+  );
 
   const { data: events, isLoading } = trpc.calendar.getEvents.useQuery({
     startDate,
     endDate,
   });
-
   const { data: stats } = trpc.calendar.getStats.useQuery();
+
+  const refresh = () => {
+    void utils.calendar.getEvents.invalidate();
+    void utils.calendar.getStats.invalidate();
+  };
 
   const createEvent = trpc.calendar.createEvent.useMutation({
     onSuccess: () => {
-      utils.calendar.getEvents.invalidate();
-      utils.calendar.getStats.invalidate();
-      setShowCreateModal(false);
-      setNewEvent({
-        title: "",
-        description: "",
-        eventType: "STUDY_SESSION",
-        date: new Date().toISOString().split("T")[0],
-        priority: "MEDIUM",
-      });
+      refresh();
+      setShowCreate(false);
+      setForm((prev) => ({ ...prev, title: "", description: "" }));
     },
   });
+  const toggleComplete = trpc.calendar.toggleComplete.useMutation({ onSuccess: refresh });
+  const deleteEvent = trpc.calendar.deleteEvent.useMutation({ onSuccess: refresh });
 
-  const toggleComplete = trpc.calendar.toggleComplete.useMutation({
-    onSuccess: () => {
-      utils.calendar.getEvents.invalidate();
-      utils.calendar.getStats.invalidate();
-    },
-  });
-
-  const deleteEvent = trpc.calendar.deleteEvent.useMutation({
-    onSuccess: () => {
-      utils.calendar.getEvents.invalidate();
-      utils.calendar.getStats.invalidate();
-    },
-  });
-
-  // Filter events for the selected date
-  const selectedDateEvents = useMemo(() => {
+  const selectedEvents = useMemo(() => {
     if (!selectedDate || !events) return [];
     return events.filter(
       (e) => new Date(e.date).toDateString() === selectedDate.toDateString()
     );
   }, [events, selectedDate]);
 
-  const handleCreateEvent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEvent.title.trim()) return;
+  // Close the dialog on Escape.
+  useEffect(() => {
+    if (!showCreate) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowCreate(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showCreate]);
 
-    createEvent.mutate({
-      title: newEvent.title.trim(),
-      description: newEvent.description.trim() || undefined,
-      eventType: newEvent.eventType as
-        | "EXAM"
-        | "ASSIGNMENT"
-        | "DEADLINE"
-        | "LECTURE"
-        | "STUDY_SESSION"
-        | "REVIEW"
-        | "OTHER",
-      date: newEvent.date,
-      priority: newEvent.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-    });
+  const openCreate = () => {
+    if (selectedDate) {
+      setForm((prev) => ({
+        ...prev,
+        date: selectedDate.toISOString().split("T")[0],
+      }));
+    }
+    setShowCreate(true);
   };
 
-  return (
-    <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-surface-900">
-            Study Calendar
-          </h1>
-          <p className="mt-1 text-surface-500">
-            Track exams, deadlines, and study sessions
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            if (selectedDate) {
-              setNewEvent((prev) => ({
-                ...prev,
-                date: selectedDate.toISOString().split("T")[0],
-              }));
-            }
-            setShowCreateModal(true);
-          }}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-arcus-600 to-arcus-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-arcus-600/20 transition-all hover:shadow-lg hover:shadow-arcus-600/30 active:scale-[0.98]"
-        >
-          <Plus className="h-4 w-4" />
-          Add Event
-        </button>
-      </div>
+  const fieldClass =
+    "w-full rounded-md border border-line bg-surface-0 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:border-surface-400 focus:outline-none";
 
-      {/* Stats */}
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Study"
+        title="Calendar"
+        description="Exams, deadlines, and study sessions — added by hand, or extracted from your documents by the chat assistant."
+        action={
+          <Button variant="solid" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" />
+            Add event
+          </Button>
+        }
+      />
+
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[
-            {
-              label: "Total Events",
-              value: stats.totalEvents,
-              icon: CalendarDays,
-              color: "text-arcus-600",
-              bg: "bg-arcus-50",
-            },
-            {
-              label: "Upcoming Exams",
-              value: stats.upcomingExams,
-              icon: GraduationCap,
-              color: "text-red-600",
-              bg: "bg-red-50",
-            },
-            {
-              label: "Pending Tasks",
-              value: stats.pendingTasks,
-              icon: Target,
-              color: "text-amber-600",
-              bg: "bg-amber-50",
-            },
-            {
-              label: "Completed",
-              value: stats.completedTasks,
-              icon: TrendingUp,
-              color: "text-emerald-600",
-              bg: "bg-emerald-50",
-            },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-surface-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className={cn("rounded-xl p-2.5", stat.bg)}>
-                  <stat.icon className={cn("h-5 w-5", stat.color)} />
-                </div>
-                <div>
-                  <p className="text-xs text-surface-500">{stat.label}</p>
-                  <p className="text-xl font-bold text-surface-900">
-                    {stat.value}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <Panel className="grid grid-cols-2 divide-line md:grid-cols-4 md:divide-x">
+          <div className="border-b border-line p-4 md:border-b-0">
+            <Metric label="Events" value={stats.totalEvents} />
+          </div>
+          <div className="border-b border-line p-4 md:border-b-0">
+            <Metric
+              label="Upcoming exams"
+              value={stats.upcomingExams}
+              tone={stats.upcomingExams > 0 ? "err" : "idle"}
+            />
+          </div>
+          <div className="p-4">
+            <Metric
+              label="Pending"
+              value={stats.pendingTasks}
+              tone={stats.pendingTasks > 0 ? "warn" : "idle"}
+            />
+          </div>
+          <div className="p-4">
+            <Metric
+              label="Completed"
+              value={stats.completedTasks}
+              tone={stats.completedTasks > 0 ? "ok" : "idle"}
+            />
+          </div>
+        </Panel>
       )}
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Calendar Grid */}
-        <div className="lg:col-span-2">
-          <CalendarGrid
-            events={events || []}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            currentMonth={currentMonth}
-            onMonthChange={setCurrentMonth}
-          />
-        </div>
+      <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
+        <CalendarGrid
+          events={events ?? []}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          currentMonth={currentMonth}
+          onMonthChange={setCurrentMonth}
+        />
 
-        {/* Events Sidebar */}
         <div className="space-y-4">
-          <div className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-surface-900">
-              <CalendarDays className="h-4 w-4 text-arcus-500" />
-              {selectedDate
-                ? selectedDate.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : "Select a date"}
-            </h3>
+          <Panel>
+            <PanelHeader
+              title={
+                selectedDate
+                  ? selectedDate.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })
+                  : "Select a date"
+              }
+              description={
+                selectedEvents.length > 0
+                  ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
+                  : undefined
+              }
+              action={
+                <Button variant="ghost" size="sm" onClick={openCreate}>
+                  <Plus className="h-3 w-3" />
+                  Add
+                </Button>
+              }
+            />
 
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="h-20 animate-pulse rounded-xl bg-surface-100"
-                  />
-                ))}
-              </div>
-            ) : selectedDateEvents.length > 0 ? (
-              <div className="space-y-3">
-                {selectedDateEvents.map((event) => (
+            <div className="space-y-2 p-3">
+              {isLoading ? (
+                [0, 1].map((i) => <Skeleton key={i} className="h-16 w-full" />)
+              ) : selectedEvents.length > 0 ? (
+                selectedEvents.map((event) => (
                   <EventCard
                     key={event.id}
                     event={event}
                     onToggleComplete={(id) => toggleComplete.mutate({ id })}
                     onDelete={(id) => deleteEvent.mutate({ id })}
                   />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center py-8 text-center">
-                <CalendarDays className="mb-3 h-8 w-8 text-surface-300" />
-                <p className="text-sm font-medium text-surface-500">
-                  No events on this day
-                </p>
-                <p className="mt-1 text-xs text-surface-400">
-                  Ask Arcus to extract dates from your documents, or add events
-                  manually.
-                </p>
-                <button
-                  onClick={() => {
-                    if (selectedDate) {
-                      setNewEvent((prev) => ({
-                        ...prev,
-                        date: selectedDate.toISOString().split("T")[0],
-                      }));
-                    }
-                    setShowCreateModal(true);
-                  }}
-                  className="mt-4 flex items-center gap-1.5 rounded-lg bg-arcus-50 px-3 py-1.5 text-xs font-medium text-arcus-600 transition-colors hover:bg-arcus-100"
-                >
-                  <Plus className="h-3 w-3" />
-                  Add event
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* AI Tip */}
-          <div className="rounded-2xl border border-arcus-200 bg-gradient-to-br from-arcus-50/50 to-purple-50/50 p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-arcus-500 to-purple-500">
-                <Sparkles className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-surface-900">
-                  AI-Powered Scheduling
-                </h4>
-                <p className="mt-1 text-xs text-surface-500">
-                  Use the Chat page to ask Arcus to automatically extract dates
-                  and deadlines from your documents, or generate a study plan
-                  for your upcoming exams.
-                </p>
-                <p className="mt-2 text-xs font-medium text-arcus-600">
-                  Try: &quot;Extract all deadlines from my documents&quot;
-                </p>
-              </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center px-4 py-8 text-center">
+                  <CalendarDays
+                    className="mb-2 h-5 w-5 text-surface-300"
+                    strokeWidth={1.5}
+                  />
+                  <p className="text-xs font-medium text-surface-500">
+                    Nothing scheduled
+                  </p>
+                  <p className="mt-0.5 text-xs text-surface-400">
+                    Add an event, or ask the chat to extract deadlines from your
+                    documents.
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
+          </Panel>
+
+          <Panel className="p-4">
+            <p className="font-mono text-2xs tracking-[0.12em] text-surface-400 uppercase">
+              Legend
+            </p>
+            <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {EVENT_TYPES.map((type) => (
+                <span
+                  key={type.value}
+                  className="flex items-center gap-1.5 text-xs text-surface-500"
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      EVENT_DOT[type.value]
+                    )}
+                  />
+                  {type.label}
+                </span>
+              ))}
+            </div>
+          </Panel>
         </div>
       </div>
 
-      {/* Create Event Modal */}
-      {showCreateModal && (
-        <>
+      {/* ── Create dialog ── */}
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/25 p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setShowCreate(false);
+          }}
+        >
           <div
-            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-2xl border border-surface-200 bg-white p-6 shadow-2xl">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-surface-900">
-                  Add Study Event
-                </h3>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-600"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add study event"
+            className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface-0 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <h2 className="text-sm font-semibold text-surface-900">
+                Add study event
+              </h2>
+              <button
+                onClick={() => setShowCreate(false)}
+                aria-label="Close"
+                className="rounded p-1 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!form.title.trim()) return;
+                createEvent.mutate({
+                  title: form.title.trim(),
+                  description: form.description.trim() || undefined,
+                  eventType: form.eventType,
+                  date: form.date,
+                  priority: form.priority,
+                });
+              }}
+              className="space-y-4 p-4"
+            >
+              <div>
+                <label
+                  htmlFor="event-title"
+                  className="mb-1.5 block font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase"
                 >
-                  <X className="h-5 w-5" />
-                </button>
+                  Title
+                </label>
+                <input
+                  id="event-title"
+                  value={form.title}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, title: event.target.value }))
+                  }
+                  placeholder="Midterm exam, problem set 3…"
+                  required
+                  autoFocus
+                  className={fieldClass}
+                />
               </div>
 
-              <form onSubmit={handleCreateEvent} className="space-y-4">
-                {/* Title */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-surface-700">
-                    Title
-                  </label>
-                  <input
-                    type="text"
-                    value={newEvent.title}
-                    onChange={(e) =>
-                      setNewEvent((prev) => ({
-                        ...prev,
-                        title: e.target.value,
-                      }))
-                    }
-                    placeholder="e.g. Midterm Exam, Assignment Due"
-                    className="w-full rounded-xl border border-surface-200 bg-surface-50 px-4 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:border-arcus-500 focus:bg-white focus:ring-2 focus:ring-arcus-500/20 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                {/* Event Type */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-surface-700">
-                    Type
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {EVENT_TYPE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() =>
-                          setNewEvent((prev) => ({
-                            ...prev,
-                            eventType: opt.value,
-                          }))
-                        }
+              <div>
+                <span className="mb-1.5 block font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase">
+                  Type
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {EVENT_TYPES.map((type) => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({ ...prev, eventType: type.value }))
+                      }
+                      aria-pressed={form.eventType === type.value}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors",
+                        form.eventType === type.value
+                          ? "border-surface-900 bg-surface-900 text-white"
+                          : "border-line text-surface-600 hover:border-line-strong"
+                      )}
+                    >
+                      <span
                         className={cn(
-                          "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
-                          newEvent.eventType === opt.value
-                            ? "border-arcus-500 bg-arcus-50 text-arcus-700"
-                            : "border-surface-200 text-surface-500 hover:border-surface-300"
+                          "h-1.5 w-1.5 rounded-full",
+                          EVENT_DOT[type.value]
                         )}
-                      >
-                        <opt.icon className="h-3.5 w-3.5" />
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
+                      />
+                      {type.label}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Date */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-surface-700">
+                  <label
+                    htmlFor="event-date"
+                    className="mb-1.5 block font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase"
+                  >
                     Date
                   </label>
                   <input
+                    id="event-date"
                     type="date"
-                    value={newEvent.date}
-                    onChange={(e) =>
-                      setNewEvent((prev) => ({
-                        ...prev,
-                        date: e.target.value,
-                      }))
+                    value={form.date}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, date: event.target.value }))
                     }
-                    className="w-full rounded-xl border border-surface-200 bg-surface-50 px-4 py-2.5 text-sm text-surface-900 focus:border-arcus-500 focus:bg-white focus:ring-2 focus:ring-arcus-500/20 focus:outline-none"
                     required
+                    className={cn(fieldClass, "font-mono tabular")}
                   />
                 </div>
-
-                {/* Priority */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-surface-700">
+                  <label
+                    htmlFor="event-priority"
+                    className="mb-1.5 block font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase"
+                  >
                     Priority
                   </label>
-                  <div className="flex gap-2">
-                    {PRIORITY_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() =>
-                          setNewEvent((prev) => ({
-                            ...prev,
-                            priority: opt.value,
-                          }))
-                        }
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
-                          newEvent.priority === opt.value
-                            ? "border-arcus-500 bg-arcus-50 text-arcus-700"
-                            : "border-surface-200 text-surface-500 hover:border-surface-300"
-                        )}
-                      >
-                        <span
-                          className={cn("h-2 w-2 rounded-full", opt.color)}
-                        />
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-surface-700">
-                    Description (optional)
-                  </label>
-                  <textarea
-                    value={newEvent.description}
-                    onChange={(e) =>
-                      setNewEvent((prev) => ({
+                  <select
+                    id="event-priority"
+                    value={form.priority}
+                    onChange={(event) =>
+                      setForm((prev) => ({
                         ...prev,
-                        description: e.target.value,
+                        priority: event.target.value as Priority,
                       }))
                     }
-                    placeholder="Additional notes..."
-                    rows={2}
-                    className="w-full rounded-xl border border-surface-200 bg-surface-50 px-4 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:border-arcus-500 focus:bg-white focus:ring-2 focus:ring-arcus-500/20 focus:outline-none"
-                  />
+                    className={fieldClass}
+                  >
+                    {PRIORITIES.map((priority) => (
+                      <option key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
 
-                {/* Submit */}
-                <button
-                  type="submit"
-                  disabled={createEvent.isPending || !newEvent.title.trim()}
-                  className="w-full rounded-xl bg-gradient-to-r from-arcus-600 to-arcus-500 py-2.5 text-sm font-semibold text-white shadow-md shadow-arcus-600/20 transition-all hover:shadow-lg hover:shadow-arcus-600/30 disabled:opacity-50"
+              <div>
+                <label
+                  htmlFor="event-description"
+                  className="mb-1.5 block font-mono text-2xs tracking-[0.1em] text-surface-400 uppercase"
                 >
-                  {createEvent.isPending ? "Creating..." : "Add to Calendar"}
-                </button>
-              </form>
-            </div>
+                  Notes
+                </label>
+                <textarea
+                  id="event-description"
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      description: event.target.value,
+                    }))
+                  }
+                  rows={2}
+                  placeholder="Optional"
+                  className={cn(fieldClass, "resize-none")}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-line pt-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowCreate(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="solid"
+                  loading={createEvent.isPending}
+                  disabled={!form.title.trim()}
+                >
+                  Add to calendar
+                </Button>
+              </div>
+            </form>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

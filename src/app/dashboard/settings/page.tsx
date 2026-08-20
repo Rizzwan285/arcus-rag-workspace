@@ -1,216 +1,210 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
-import {
-  User,
-  Mail,
-  Shield,
-  LogOut,
-  AlertTriangle,
-  Trash2,
-  ExternalLink,
-} from "lucide-react";
 import { useState } from "react";
+import Image from "next/image";
+import { signOut, useSession } from "next-auth/react";
+import { ExternalLink, LogOut, Trash2, TriangleAlert } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
+import {
+  Button,
+  Field,
+  Metric,
+  Panel,
+  PanelHeader,
+  PageHeader,
+} from "@/components/ui";
+import { formatNumber } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteText, setDeleteText] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: stats } = trpc.document.getStats.useQuery(undefined, {
     enabled: !!session?.user,
   });
 
+  const deleteAccount = trpc.account.deleteAccount.useMutation({
+    onSuccess: () => signOut({ callbackUrl: "/" }),
+    onError: (error) => setDeleteError(error.message),
+  });
+
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      {/* Header */}
-      <div className="animate-fade-in">
-        <h1 className="text-3xl font-bold tracking-tight text-surface-900">
-          Settings
-        </h1>
-        <p className="mt-1 text-surface-500">
-          Manage your account and preferences
-        </p>
-      </div>
+    <div className="max-w-3xl space-y-8">
+      <PageHeader
+        eyebrow="Account"
+        title="Settings"
+        description="Your profile, workspace usage, and account controls."
+      />
 
-      {/* ── Profile Section ── */}
-      <div className="card animate-fade-in animate-delay-1 overflow-hidden">
-        <div className="border-b border-surface-200 bg-gradient-to-r from-arcus-50/50 to-purple-50/30 px-6 py-4">
-          <h2 className="text-sm font-semibold text-surface-900">Profile</h2>
-          <p className="text-xs text-surface-500">
-            Your account information from OAuth provider
-          </p>
+      {/* ── Profile ── */}
+      <Panel>
+        <PanelHeader
+          title="Profile"
+          description="Provided by your OAuth provider — not editable here"
+        />
+        <div className="flex items-start gap-5 p-4">
+          {session?.user?.image ? (
+            <Image
+              src={session.user.image}
+              alt=""
+              width={56}
+              height={56}
+              unoptimized
+              className="h-14 w-14 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-100 font-mono text-lg font-semibold text-surface-500">
+              {session?.user?.name?.[0]?.toUpperCase() ?? "?"}
+            </span>
+          )}
+
+          <dl className="min-w-0 flex-1 divide-y divide-line">
+            <Field label="Name" mono={false}>
+              {session?.user?.name ?? "Not set"}
+            </Field>
+            <Field label="Email">{session?.user?.email ?? "Not set"}</Field>
+            <Field label="Provider" mono={false}>
+              OAuth · Google or GitHub
+            </Field>
+          </dl>
         </div>
-        <div className="p-6">
-          <div className="flex items-start gap-6">
-            {/* Avatar */}
-            {session?.user?.image ? (
-              <img
-                src={session.user.image}
-                alt={session.user.name || "User"}
-                className="h-20 w-20 rounded-2xl object-cover ring-4 ring-surface-100"
-              />
-            ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-arcus-500 to-purple-500 text-2xl font-bold text-white">
-                {session?.user?.name?.[0] || "U"}
-              </div>
-            )}
+      </Panel>
 
-            {/* Details */}
-            <div className="flex-1 space-y-4">
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-surface-500">
-                  <User className="h-3 w-3" />
-                  Full Name
-                </label>
-                <p className="mt-0.5 text-sm font-semibold text-surface-900">
-                  {session?.user?.name || "Not set"}
-                </p>
-              </div>
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-surface-500">
-                  <Mail className="h-3 w-3" />
-                  Email Address
-                </label>
-                <p className="mt-0.5 text-sm font-semibold text-surface-900">
-                  {session?.user?.email || "Not set"}
-                </p>
-              </div>
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-surface-500">
-                  <Shield className="h-3 w-3" />
-                  Auth Provider
-                </label>
-                <p className="mt-0.5 text-sm font-semibold text-surface-900">
-                  OAuth (Google / GitHub)
-                </p>
-              </div>
-            </div>
+      {/* ── Usage ── */}
+      <Panel>
+        <PanelHeader
+          title="Usage"
+          description="What this account currently holds"
+        />
+        <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-3">
+          <div className="p-4">
+            <Metric label="Documents" value={stats?.documentCount ?? 0} />
+          </div>
+          <div className="p-4">
+            <Metric
+              label="Chunks"
+              value={formatNumber(stats?.chunkCount ?? 0)}
+            />
+          </div>
+          <div className="p-4">
+            <Metric label="Chats" value={stats?.chatSessionCount ?? 0} />
+          </div>
+          <div className="p-4">
+            <Metric label="Decks" value={stats?.flashcardDeckCount ?? 0} />
+          </div>
+          <div className="p-4">
+            <Metric label="Quizzes" value={stats?.quizCount ?? 0} />
+          </div>
+          <div className="p-4">
+            <Metric
+              label="Failed"
+              value={stats?.failedCount ?? 0}
+              tone={(stats?.failedCount ?? 0) > 0 ? "err" : "idle"}
+            />
           </div>
         </div>
-      </div>
+      </Panel>
 
-      {/* ── Account Usage ── */}
-      <div className="card animate-fade-in animate-delay-2 overflow-hidden">
-        <div className="border-b border-surface-200 px-6 py-4">
-          <h2 className="text-sm font-semibold text-surface-900">Usage</h2>
-          <p className="text-xs text-surface-500">
-            Your current workspace activity
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-px bg-surface-100 sm:grid-cols-4">
-          {[
-            { label: "Documents", value: stats?.documentCount ?? 0 },
-            { label: "Chat Sessions", value: stats?.chatSessionCount ?? 0 },
-            { label: "Flashcard Decks", value: stats?.flashcardDeckCount ?? 0 },
-            { label: "Quizzes", value: stats?.quizCount ?? 0 },
-          ].map((item) => (
-            <div key={item.label} className="bg-white p-5 text-center">
-              <p className="text-2xl font-bold text-surface-900">{item.value}</p>
-              <p className="mt-0.5 text-xs text-surface-500">{item.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* ── Resources ── */}
+      <Panel>
+        <PanelHeader title="Resources" />
+        <a
+          href="https://github.com/Rizzwan285/arcus-rag-workspace"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2.5 px-4 py-3 text-sm text-surface-600 transition-colors hover:bg-surface-50 hover:text-surface-900"
+        >
+          <ExternalLink className="h-3.5 w-3.5 text-surface-400" />
+          View source on GitHub
+        </a>
+      </Panel>
 
-      {/* ── Quick Links ── */}
-      <div className="card animate-fade-in animate-delay-3 overflow-hidden">
-        <div className="border-b border-surface-200 px-6 py-4">
-          <h2 className="text-sm font-semibold text-surface-900">Resources</h2>
+      {/* ── Session ── */}
+      <Panel>
+        <PanelHeader title="Session" />
+        <div className="p-4">
+          <Button onClick={() => signOut({ callbackUrl: "/" })}>
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </Button>
         </div>
-        <div className="divide-y divide-surface-100">
-          <a
-            href="https://github.com/Rizzwan285/arcus-rag-workspace"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-6 py-4 text-sm text-surface-600 transition-colors hover:bg-surface-50"
-          >
-            <ExternalLink className="h-4 w-4 text-surface-400" />
-            View Source on GitHub
-          </a>
-        </div>
-      </div>
+      </Panel>
 
-      {/* ── Sign Out ── */}
-      <div className="card animate-fade-in animate-delay-4 overflow-hidden">
-        <div className="border-b border-surface-200 px-6 py-4">
-          <h2 className="text-sm font-semibold text-surface-900">Session</h2>
-        </div>
-        <div className="p-6">
-          <button
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="flex items-center gap-2 rounded-xl border border-surface-200 px-5 py-2.5 text-sm font-medium text-surface-600 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </button>
-        </div>
-      </div>
-
-      {/* ── Danger Zone ── */}
-      <div className="animate-fade-in animate-delay-5 overflow-hidden rounded-2xl border border-red-200">
-        <div className="border-b border-red-200 bg-red-50/50 px-6 py-4">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-red-700">
-            <AlertTriangle className="h-4 w-4" />
-            Danger Zone
+      {/* ── Danger zone ── */}
+      <Panel className="border-red-200">
+        <div className="border-b border-red-200 bg-err-soft px-4 py-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-err">
+            <TriangleAlert className="h-3.5 w-3.5" />
+            Danger zone
           </h2>
-          <p className="text-xs text-red-500">
-            Irreversible and destructive actions
+          <p className="mt-0.5 text-xs text-surface-500">
+            Deleting your account is immediate and cannot be undone.
           </p>
         </div>
-        <div className="bg-white p-6">
-          {!showDeleteConfirm ? (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 rounded-xl border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition-all hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete My Account
-            </button>
+
+        <div className="p-4">
+          {!confirmingDelete ? (
+            <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete my account
+            </Button>
           ) : (
-            <div className="space-y-4">
-              <p className="text-sm text-surface-600">
-                This will permanently delete your account and all associated
-                data (documents, chats, flashcards, quizzes). Type{" "}
-                <code className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-600">
+            <div className="space-y-3">
+              <p className="text-sm leading-relaxed text-surface-600">
+                This permanently removes your account and everything attached to
+                it — {stats?.documentCount ?? 0} document
+                {stats?.documentCount === 1 ? "" : "s"},{" "}
+                {formatNumber(stats?.chunkCount ?? 0)} indexed chunks, all chat
+                history, study modules, and calendar events. Type{" "}
+                <code className="rounded border border-red-200 bg-err-soft px-1.5 py-0.5 font-mono text-2xs text-err">
                   DELETE
                 </code>{" "}
                 to confirm.
               </p>
+
               <input
-                type="text"
-                value={deleteText}
-                onChange={(e) => setDeleteText(e.target.value)}
-                placeholder="Type DELETE"
-                className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:outline-none"
+                value={confirmation}
+                onChange={(event) => {
+                  setConfirmation(event.target.value);
+                  setDeleteError(null);
+                }}
+                placeholder="DELETE"
+                aria-label="Type DELETE to confirm"
+                className="w-full max-w-xs rounded-md border border-line bg-surface-0 px-3 py-2 font-mono text-sm text-surface-900 placeholder:text-surface-300 focus:border-err focus:outline-none"
               />
-              <div className="flex gap-3">
-                <button
-                  disabled={deleteText !== "DELETE"}
-                  onClick={() => {
-                    // In a real implementation, this would call a tRPC mutation
-                    alert("Account deletion would be processed. For now, signing out.");
-                    signOut({ callbackUrl: "/" });
-                  }}
-                  className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+
+              {deleteError && (
+                <p className="text-xs text-err">{deleteError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="danger"
+                  disabled={confirmation !== "DELETE"}
+                  loading={deleteAccount.isPending}
+                  onClick={() =>
+                    deleteAccount.mutate({ confirmation: "DELETE" })
+                  }
                 >
-                  Permanently Delete
-                </button>
-                <button
+                  Permanently delete
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setDeleteText("");
+                    setConfirmingDelete(false);
+                    setConfirmation("");
+                    setDeleteError(null);
                   }}
-                  className="rounded-xl border border-surface-200 px-5 py-2.5 text-sm font-medium text-surface-600 transition-colors hover:bg-surface-50"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

@@ -1,33 +1,51 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useEffect, useRef, useState } from "react";
 import {
-  FileText,
-  MessageSquare,
+  Activity,
   BookOpen,
   Brain,
-  LayoutDashboard,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Upload,
-  LogOut,
-  User,
   CalendarDays,
-  Sparkles,
+  ChevronsLeft,
+  FileText,
+  LayoutGrid,
+  LogOut,
+  MessageSquare,
+  Settings,
+  Upload,
+  User,
 } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Documents", href: "/dashboard/documents", icon: FileText },
-  { label: "Chat", href: "/dashboard/chat", icon: MessageSquare },
-  { label: "Calendar", href: "/dashboard/calendar", icon: CalendarDays },
-  { label: "Flashcards", href: "/dashboard/flashcards", icon: BookOpen },
-  { label: "Quizzes", href: "/dashboard/quizzes", icon: Brain },
+/**
+ * Navigation is grouped by intent rather than listed flat: what you are
+ * working with, what you study from, and how the system is behaving.
+ */
+const navGroups = [
+  {
+    label: "Workspace",
+    items: [
+      { label: "Overview", href: "/dashboard", icon: LayoutGrid },
+      { label: "Documents", href: "/dashboard/documents", icon: FileText },
+      { label: "Chat", href: "/dashboard/chat", icon: MessageSquare },
+    ],
+  },
+  {
+    label: "Study",
+    items: [
+      { label: "Calendar", href: "/dashboard/calendar", icon: CalendarDays },
+      { label: "Flashcards", href: "/dashboard/flashcards", icon: BookOpen },
+      { label: "Quizzes", href: "/dashboard/quizzes", icon: Brain },
+    ],
+  },
+  {
+    label: "System",
+    items: [{ label: "Pipeline", href: "/dashboard/pipeline", icon: Activity }],
+  },
 ];
 
 export default function DashboardLayout({
@@ -36,174 +54,209 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
   const { data: session } = useSession();
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss the account menu on an outside click or Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
 
   return (
-    <div className="flex h-screen bg-surface-50">
-      {/* ── Dark Sidebar ── */}
+    <div className="flex h-screen overflow-hidden bg-surface-0">
       <aside
         className={cn(
-          "flex flex-col transition-all duration-300",
-          collapsed ? "w-[72px]" : "w-64",
-          "bg-sidebar-bg"
+          "flex shrink-0 flex-col border-r border-line bg-surface-50 transition-[width] duration-200",
+          collapsed ? "w-[60px]" : "w-[228px]"
         )}
       >
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-arcus-500 to-arcus-700 font-bold text-white shadow-lg shadow-arcus-600/30">
+        {/* ── Identity ── */}
+        <div className="flex h-14 items-center gap-2.5 px-3.5">
+          <Link
+            href="/"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-900 font-mono text-sm font-bold text-white"
+            aria-label="Arcus home"
+          >
             A
-          </div>
+          </Link>
           {!collapsed && (
-            <span className="text-lg font-bold tracking-tight text-sidebar-text-active">
-              Arcus
-            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold tracking-tight text-surface-900">
+                Arcus
+              </p>
+              <p className="font-mono text-2xs text-surface-400">
+                hybrid retrieval
+              </p>
+            </div>
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-3">
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "sidebar-active-glow bg-arcus-600/10 text-sidebar-text-active"
-                    : "text-sidebar-text hover:bg-sidebar-surface hover:text-sidebar-text-active"
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                <item.icon
-                  className={cn(
-                    "h-5 w-5 flex-shrink-0 transition-colors",
-                    isActive
-                      ? "text-arcus-400"
-                      : "text-sidebar-text group-hover:text-sidebar-text-active"
-                  )}
-                />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Upload Button */}
-        <div className="border-t border-sidebar-border p-3">
+        {/* ── Primary action ── */}
+        <div className="px-2.5 pb-3">
           <Link
             href="/dashboard/documents"
             className={cn(
-              "flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-arcus-600 to-arcus-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-arcus-600/25 transition-all hover:shadow-arcus-600/40",
-              collapsed ? "px-2" : ""
+              "flex h-8 items-center gap-2 rounded-md bg-surface-900 text-sm font-medium text-white transition-colors hover:bg-surface-800",
+              collapsed ? "justify-center px-0" : "px-2.5"
             )}
+            title={collapsed ? "Upload document" : undefined}
           >
-            <Upload className="h-4 w-4" />
+            <Upload className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             {!collapsed && <span>Upload</span>}
           </Link>
         </div>
 
-        {/* Collapse Toggle */}
-        <div className="border-t border-sidebar-border p-3">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="flex w-full items-center justify-center rounded-lg py-2 text-sidebar-text transition-colors hover:bg-sidebar-surface hover:text-sidebar-text-active"
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
+        {/* ── Navigation ── */}
+        <nav className="flex-1 overflow-y-auto px-2.5 pb-3">
+          {navGroups.map((group) => (
+            <div key={group.label} className="mb-4">
+              {!collapsed && (
+                <p className="mb-1 px-2 font-mono text-2xs tracking-[0.12em] text-surface-400 uppercase">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      title={collapsed ? item.label : undefined}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "relative flex h-8 items-center gap-2.5 rounded-md text-sm transition-colors",
+                        collapsed ? "justify-center px-0" : "px-2",
+                        active
+                          ? "bg-surface-200/70 font-medium text-surface-900"
+                          : "text-surface-500 hover:bg-surface-100 hover:text-surface-900"
+                      )}
+                    >
+                      {/* The accent appears only here — it marks where you are. */}
+                      {active && (
+                        <span className="absolute top-1/2 -left-2.5 h-4 w-[2px] -translate-y-1/2 rounded-r bg-arcus-600" />
+                      )}
+                      <item.icon
+                        className="h-4 w-4 shrink-0"
+                        strokeWidth={active ? 2 : 1.75}
+                      />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* ── Account ── */}
+        <div className="border-t border-line p-2.5" ref={menuRef}>
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md p-1.5 text-left transition-colors hover:bg-surface-100",
+                collapsed && "justify-center"
+              )}
+            >
+              {session?.user?.image ? (
+                <Image
+                  src={session.user.image}
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 shrink-0 rounded-full object-cover"
+                  unoptimized
+                />
+              ) : (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-200 font-mono text-2xs font-semibold text-surface-600">
+                  {session?.user?.name?.[0]?.toUpperCase() ?? (
+                    <User className="h-3 w-3" />
+                  )}
+                </span>
+              )}
+              {!collapsed && (
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium text-surface-800">
+                    {session?.user?.name ?? "Account"}
+                  </span>
+                  <span className="block truncate font-mono text-2xs text-surface-400">
+                    {session?.user?.email ?? ""}
+                  </span>
+                </span>
+              )}
+            </button>
+
+            {menuOpen && (
+              <div
+                role="menu"
+                className="absolute bottom-full left-0 z-50 mb-1.5 w-full min-w-[200px] overflow-hidden rounded-lg border border-line bg-surface-0 shadow-lg"
+              >
+                <Link
+                  href="/dashboard/settings"
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm text-surface-600 transition-colors hover:bg-surface-50 hover:text-surface-900"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Settings
+                </Link>
+                <button
+                  role="menuitem"
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="flex w-full items-center gap-2.5 border-t border-line px-3 py-2 text-sm text-surface-600 transition-colors hover:bg-err-soft hover:text-err"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign out
+                </button>
+              </div>
             )}
+          </div>
+
+          <button
+            onClick={() => setCollapsed((value) => !value)}
+            className={cn(
+              "mt-1 flex h-7 w-full items-center gap-2.5 rounded-md px-2 text-xs text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-700",
+              collapsed && "justify-center px-0"
+            )}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <ChevronsLeft
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 transition-transform",
+                collapsed && "rotate-180"
+              )}
+            />
+            {!collapsed && <span>Collapse</span>}
           </button>
         </div>
       </aside>
 
-      {/* ── Main Content ── */}
-      <main className="flex-1 overflow-auto">
-        {/* Top Bar */}
-        <header className="flex h-14 items-center justify-between border-b border-surface-200 bg-white/80 px-8 backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-arcus-500" />
-            <span className="text-xs font-medium tracking-wide text-surface-400 uppercase">
-              AI-Powered Workspace
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Settings Link */}
-            <Link
-              href="/dashboard/settings"
-              className="rounded-lg p-2 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-600"
-            >
-              <Settings className="h-4 w-4" />
-            </Link>
-
-            {/* User Avatar & Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-surface-100"
-              >
-                {session?.user?.image ? (
-                  <img
-                    src={session.user.image}
-                    alt={session.user.name || "User"}
-                    className="h-8 w-8 rounded-full object-cover ring-2 ring-surface-200"
-                  />
-                ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-arcus-500 to-purple-500 text-xs font-bold text-white">
-                    {session?.user?.name?.[0] || <User className="h-4 w-4" />}
-                  </div>
-                )}
-              </button>
-
-              {/* Dropdown */}
-              {showUserMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowUserMenu(false)}
-                  />
-                  <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-surface-200 bg-white shadow-xl">
-                    <div className="border-b border-surface-100 p-4">
-                      <p className="truncate text-sm font-semibold text-surface-900">
-                        {session?.user?.name || "User"}
-                      </p>
-                      <p className="truncate text-xs text-surface-500">
-                        {session?.user?.email || ""}
-                      </p>
-                    </div>
-                    <div className="p-1">
-                      <Link
-                        href="/dashboard/settings"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-surface-600 transition-colors hover:bg-surface-100"
-                      >
-                        <Settings className="h-4 w-4" />
-                        Settings
-                      </Link>
-                      <button
-                        onClick={() => signOut({ callbackUrl: "/" })}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <div className="p-8">{children}</div>
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[1180px] px-8 py-8">{children}</div>
       </main>
     </div>
   );

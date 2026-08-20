@@ -1,238 +1,374 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Arcus Design System
+   ───────────────────────────────────────────────────────────────────────
+   Near-monochrome, hairline-ruled, typographically driven. Colour is a
+   signal, not decoration: the accent marks interaction, and the status hues
+   appear only as small dots and labels. Metrics are always monospaced with
+   tabular figures so columns of numbers line up.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  /* ── Brand Palette ── */
-  --color-arcus-50: #f0f0ff;
-  --color-arcus-100: #e0dffe;
-  --color-arcus-200: #c6c4fd;
-  --color-arcus-300: #a19dfb;
-  --color-arcus-400: #7c6df7;
-  --color-arcus-500: #6346f1;
-  --color-arcus-600: #5529e6;
-  --color-arcus-700: #481dcb;
-  --color-arcus-800: #3c1aa5;
-  --color-arcus-900: #331987;
-  --color-arcus-950: #1e0d5c;
+  /* ── Accent: one cobalt, used for interaction and nothing else ── */
+  --color-arcus-50: #eef2ff;
+  --color-arcus-100: #dfe6ff;
+  --color-arcus-200: #c4d0ff;
+  --color-arcus-300: #9db0fd;
+  --color-arcus-400: #7189f9;
+  --color-arcus-500: #4c63f0;
+  --color-arcus-600: #3345dd;
+  --color-arcus-700: #2833b8;
+  --color-arcus-800: #242e93;
+  --color-arcus-900: #232d75;
+  --color-arcus-950: #171c44;
 
-  /* ── Warm Neutrals ── */
-  --color-surface-50: #faf9f7;
-  --color-surface-100: #f3f1ed;
-  --color-surface-200: #e8e5df;
-  --color-surface-300: #d4d0c8;
-  --color-surface-400: #a8a29e;
-  --color-surface-500: #78716c;
-  --color-surface-600: #57534e;
-  --color-surface-700: #44403c;
-  --color-surface-800: #292524;
-  --color-surface-900: #1c1917;
-  --color-surface-950: #0c0a09;
+  /* ── Neutral surfaces: the entire interface lives here ── */
+  --color-surface-0: #ffffff;
+  --color-surface-50: #fafafa;
+  --color-surface-100: #f4f4f5;
+  --color-surface-200: #e7e7ea;
+  --color-surface-300: #d3d3d8;
+  --color-surface-400: #a0a0ab;
+  --color-surface-500: #70707b;
+  --color-surface-600: #51525c;
+  --color-surface-700: #3f3f46;
+  --color-surface-800: #26272b;
+  --color-surface-900: #18181b;
+  --color-surface-950: #09090b;
 
-  /* ── Dark Sidebar ── */
-  --color-sidebar-bg: #12111a;
-  --color-sidebar-surface: #1a1928;
-  --color-sidebar-border: #2a2840;
-  --color-sidebar-text: #a09cb8;
-  --color-sidebar-text-active: #f0eeff;
+  /* ── Hairlines: two weights, nothing heavier ── */
+  --color-line: #e7e7ea;
+  --color-line-strong: #d3d3d8;
 
-  /* ── Warm Gold Accent ── */
-  --color-gold-50: #fefce8;
-  --color-gold-100: #fef9c3;
-  --color-gold-200: #fef08a;
-  --color-gold-300: #fde047;
-  --color-gold-400: #facc15;
-  --color-gold-500: #eab308;
+  /* ── Status: reserved for pipeline and document state ── */
+  --color-ok: #15803d;
+  --color-ok-soft: #f0fdf4;
+  --color-warn: #b45309;
+  --color-warn-soft: #fffbeb;
+  --color-err: #b91c1c;
+  --color-err-soft: #fef2f2;
+  --color-busy: #3345dd;
+  --color-busy-soft: #eef2ff;
 
   /* ── Typography ── */
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-jet), ui-monospace, "SF Mono", monospace;
+
+  /* A tight scale — the jumps are small so density reads as deliberate. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.375rem;
+  --text-4xl--line-height: 2.625rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 3.125rem;
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 3.875rem;
+
+  /* ── Radii: small. Large radii read as consumer-app, not tool. ── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
 }
 
-/* ── Base Styles ── */
-* {
+/* ── Base ─────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html {
-  scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   font-family: var(--font-sans);
+  font-size: var(--text-base);
   color: var(--color-surface-900);
+  background: var(--color-surface-0);
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Headings are set tight; the scale does the work, not weight alone. */
+h1, h2, h3, h4 {
+  letter-spacing: -0.021em;
+  font-weight: 600;
+}
+
+h1 {
+  letter-spacing: -0.03em;
+}
+
+/* Numerals line up in columns wherever they are compared. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── Panel: a hairline box. The only container primitive. ────────── */
+.panel {
+  background: var(--color-surface-0);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+
+/* Interactive panels shift their border, not their elevation. */
+.panel-interactive {
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.panel-interactive:hover {
+  border-color: var(--color-line-strong);
   background: var(--color-surface-50);
 }
 
-/* ── Landing Page: Animated Gradient Background ── */
-.gradient-bg {
-  background: linear-gradient(
-    135deg,
-    #0f0c29 0%,
-    #1a1145 25%,
-    #24243e 50%,
-    #1a1145 75%,
-    #0f0c29 100%
+/* ── Focus: one ring, everywhere, always visible ──────────────────── */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-arcus-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Rule with a label, for section headers ───────────────────────── */
+.rule {
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+/* ── Hatched background for empty/placeholder regions ─────────────── */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-surface-100) 0,
+    var(--color-surface-100) 1px,
+    transparent 1px,
+    transparent 7px
   );
-  background-size: 400% 400%;
-  animation: gradientShift 15s ease infinite;
 }
 
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* ── Glow Effects ── */
-.glow-purple {
-  box-shadow: 0 0 60px rgba(99, 70, 241, 0.15),
-    0 0 120px rgba(99, 70, 241, 0.05);
-}
-
-.glow-text {
-  text-shadow: 0 0 40px rgba(99, 70, 241, 0.3);
-}
-
-/* ── Glass Morphism ── */
-.glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-light {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-}
-
-/* ── Warm Card Style ── */
-.card {
-  background: white;
-  border: 1px solid var(--color-surface-200);
-  border-radius: 16px;
-  box-shadow:
-    0 1px 2px rgba(28, 25, 23, 0.04),
-    0 4px 12px rgba(28, 25, 23, 0.03);
-  transition: all 0.2s ease;
-}
-
-.card:hover {
-  box-shadow:
-    0 2px 4px rgba(28, 25, 23, 0.06),
-    0 8px 24px rgba(28, 25, 23, 0.06);
-  transform: translateY(-1px);
-}
-
-/* ── Sidebar Active Glow ── */
-.sidebar-active-glow {
-  position: relative;
-}
-
-.sidebar-active-glow::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  border-radius: 0 4px 4px 0;
-  background: linear-gradient(180deg, var(--color-arcus-400), var(--color-arcus-600));
-  box-shadow: 0 0 12px rgba(99, 70, 241, 0.4);
-}
-
-/* ── Floating Animation ── */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-float-delayed { animation: float 6s ease-in-out 2s infinite; }
-.animate-float-slow { animation: float 8s ease-in-out 1s infinite; }
-
-/* ── Staggered Fade-in ── */
-@keyframes fadeInUp {
+/* ── Motion: short, small, and only on entry ──────────────────────── */
+@keyframes riseIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
 .animate-fade-in {
-  animation: fadeInUp 0.4s ease-out forwards;
+  animation: riseIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
 }
 
-.animate-delay-1 { animation-delay: 0.05s; }
-.animate-delay-2 { animation-delay: 0.1s; }
-.animate-delay-3 { animation-delay: 0.15s; }
-.animate-delay-4 { animation-delay: 0.2s; }
-.animate-delay-5 { animation-delay: 0.25s; }
-.animate-delay-6 { animation-delay: 0.3s; }
+.animate-delay-1 { animation-delay: 0.03s; }
+.animate-delay-2 { animation-delay: 0.06s; }
+.animate-delay-3 { animation-delay: 0.09s; }
+.animate-delay-4 { animation-delay: 0.12s; }
+.animate-delay-5 { animation-delay: 0.15s; }
+.animate-delay-6 { animation-delay: 0.18s; }
 
-/* ── Pulse Ring ── */
-@keyframes pulseRing {
-  0% { transform: scale(1); opacity: 0.5; }
-  100% { transform: scale(1.5); opacity: 0; }
+/* Indeterminate progress bar for in-flight ingestion. */
+@keyframes slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
 }
 
-.animate-pulse-ring { animation: pulseRing 2s ease-out infinite; }
-
-/* ── Grid Pattern ── */
-.grid-pattern {
-  background-image: linear-gradient(
-      rgba(255, 255, 255, 0.03) 1px,
-      transparent 1px
-    ),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
+.animate-slide {
+  animation: slide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
-/* ── Scrollbar Styling ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.animate-status-pulse {
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in {
+    opacity: 1;
+  }
+}
+
+/* ── Scrollbars: present but quiet ────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
   background: var(--color-surface-300);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover { background: var(--color-surface-400); }
-
-/* ── Shimmer Loading ── */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  border: 3px solid var(--color-surface-0);
+  border-radius: 999px;
 }
 
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.05) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-400);
 }
 
-/* ── Selection ── */
 ::selection {
-  background: rgba(99, 70, 241, 0.3);
-  color: white;
+  background: var(--color-arcus-100);
+  color: var(--color-arcus-950);
 }
 
-/* ── Status Dot Pulse ── */
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+/* ── Prose: chat answers and generated content ────────────────────── */
+.prose-arcus {
+  font-size: var(--text-base);
+  line-height: 1.65;
+  color: var(--color-surface-800);
 }
 
-.animate-status-pulse { animation: statusPulse 1.5s ease-in-out infinite; }
+.prose-arcus > * + * {
+  margin-top: 0.875em;
+}
+
+.prose-arcus h1,
+.prose-arcus h2,
+.prose-arcus h3 {
+  color: var(--color-surface-900);
+  font-weight: 600;
+  margin-top: 1.5em;
+}
+
+.prose-arcus h1 { font-size: var(--text-lg); }
+.prose-arcus h2 { font-size: var(--text-base); }
+.prose-arcus h3 { font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-surface-500); }
+
+.prose-arcus ul,
+.prose-arcus ol {
+  padding-left: 1.25em;
+}
+
+.prose-arcus ul { list-style: disc; }
+.prose-arcus ol { list-style: decimal; }
+.prose-arcus li::marker { color: var(--color-surface-400); }
+.prose-arcus li + li { margin-top: 0.3em; }
+
+.prose-arcus a {
+  color: var(--color-arcus-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-arcus code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-surface-100);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+}
+
+.prose-arcus pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--color-surface-950);
+  color: var(--color-surface-100);
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+}
+
+.prose-arcus pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+
+.prose-arcus blockquote {
+  border-left: 2px solid var(--color-line-strong);
+  padding-left: 0.875rem;
+  color: var(--color-surface-500);
+}
+
+.prose-arcus table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.prose-arcus th,
+.prose-arcus td {
+  border: 1px solid var(--color-line);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.prose-arcus th {
+  background: var(--color-surface-50);
+  font-weight: 600;
+}
+
+.prose-arcus hr {
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+/* ── Flashcard flip ───────────────────────────────────────────────── */
+.flip-scene {
+  perspective: 1600px;
+}
+
+.flip-card {
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flip-card.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-face-back {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-card {
+    transition: none;
+  }
+}

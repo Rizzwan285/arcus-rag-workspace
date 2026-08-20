@@ -4,7 +4,7 @@
  * Next.js Route Handler that implements the full RAG pipeline:
  * 1. Validates user session (NextAuth)
  * 2. Extracts the last user message
- * 3. Performs vector similarity search on pgvector
+ * 3. Performs hybrid retrieval (pgvector + full-text, fused with RRF)
  * 4. Injects retrieved context into a system prompt
  * 5. Streams the response from Gemini via Vercel AI SDK v6
  * 6. Saves messages to the database on stream completion
@@ -13,7 +13,7 @@
  * requires it for optimal streaming.
  *
  * @see Phase 4 implementation plan
- * @see ADR-011 in .claude/decisions.md
+ * @see ADR-011, ADR-015 in .claude/decisions.md
  */
 
 import { google } from "@ai-sdk/google";
@@ -25,7 +25,7 @@ import {
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
-import { searchSimilarChunks } from "@/lib/langchain/vector-search";
+import { hybridSearch } from "@/lib/retrieval/hybrid-search";
 import {
   getRAGSystemPrompt,
   formatChunksAsContext,
@@ -73,12 +73,26 @@ export async function POST(req: Request) {
       return new Response("Empty user message", { status: 400 });
     }
 
-    // 3. Perform vector similarity search
-    const similarChunks = await searchSimilarChunks(
+    // 3. Retrieve context: dense + lexical arms fused with Reciprocal Rank Fusion
+    const { chunks: similarChunks, telemetry } = await hybridSearch(
       lastUserText,
       userId,
-      5, // top 5 chunks
-      0.25 // lower threshold to be more inclusive
+      { limit: 5, candidatePool: 40 }
+    );
+
+    // Retrieval telemetry: which arm found what is the signal that tells you
+    // whether hybrid search is earning its keep on real queries.
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "info",
+        pipeline: "rag-chat",
+        event: "retrieval.completed",
+        userId,
+        sessionId,
+        queryChars: lastUserText.length,
+        ...telemetry,
+      })
     );
 
     // Fetch document titles for context attribution
@@ -113,6 +127,8 @@ export async function POST(req: Request) {
       documentTitle: docTitleMap.get(chunk.documentId) || "Unknown",
       pageNumber: chunk.pageNumber,
       similarity: chunk.similarity,
+      keywordScore: chunk.keywordScore,
+      matchedBy: chunk.matchedBy,
       preview: chunk.content.substring(0, 150) + "...",
     }));
 

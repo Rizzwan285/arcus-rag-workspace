@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCcw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button, ButtonLink, EmptyState, Panel, Skeleton } from "@/components/ui";
 
 export default function FlashcardStudyPage() {
   const params = useParams();
-  const router = useRouter();
   const deckId = params.id as string;
 
   const { data: deck, isLoading } = trpc.flashcard.getDeckById.useQuery(
@@ -20,154 +20,176 @@ export default function FlashcardStudyPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
+  const total = deck?.cards.length ?? 0;
+
+  const go = useCallback(
+    (delta: number) => {
+      setIsFlipped(false);
+      // Let the card settle face-up before swapping its content.
+      setTimeout(() => {
+        setCurrentIndex((prev) => Math.min(Math.max(prev + delta, 0), total - 1));
+      }, 140);
+    },
+    [total]
+  );
+
+  // Keyboard study loop: arrows to move, space to flip.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowRight") go(1);
+      else if (event.key === "ArrowLeft") go(-1);
+      else if (event.key === " ") {
+        event.preventDefault();
+        setIsFlipped((flipped) => !flipped);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [go]);
+
   if (isLoading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-arcus-500" />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-[320px] w-full" />
       </div>
     );
   }
 
   if (!deck || deck.cards.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl text-center py-20">
-        <h2 className="text-2xl font-bold text-surface-900">Deck not found or empty</h2>
-        <Link href="/dashboard/flashcards" className="mt-4 inline-block text-arcus-600 hover:underline">
-          Return to Flashcards
-        </Link>
-      </div>
+      <EmptyState
+        title="Deck not found"
+        description="This deck may have been deleted, or it contains no cards."
+        action={
+          <ButtonLink href="/dashboard/flashcards" size="sm">
+            Back to flashcards
+          </ButtonLink>
+        }
+      />
     );
   }
 
-  const currentCard = deck.cards[currentIndex];
-  const totalCards = deck.cards.length;
-
-  const handleNext = () => {
-    if (currentIndex < totalCards - 1) {
-      setIsFlipped(false);
-      setTimeout(() => setCurrentIndex((prev) => prev + 1), 150);
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setIsFlipped(false);
-      setTimeout(() => setCurrentIndex((prev) => prev - 1), 150);
-    }
-  };
-
-  const handleFlip = () => {
-    setIsFlipped(!isFlipped);
-  };
+  const card = deck.cards[currentIndex];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="space-y-6">
+      {/* ── Header ── */}
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+        <div className="flex min-w-0 items-start gap-3">
           <Link
             href="/dashboard/flashcards"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-500 hover:bg-surface-50 hover:text-surface-900"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line text-surface-500 transition-colors hover:bg-surface-50 hover:text-surface-900"
+            aria-label="Back to flashcards"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-surface-900">{deck.title}</h1>
-            <p className="text-sm text-surface-500">From document: {deck.document.title}</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl text-surface-900">{deck.title}</h1>
+            <p className="mt-0.5 truncate font-mono text-2xs text-surface-400">
+              {deck.document.title}
+            </p>
           </div>
         </div>
-        <div className="text-sm font-medium text-surface-500">
-          Card {currentIndex + 1} of {totalCards}
-        </div>
-      </div>
+        <p className="font-mono text-sm tabular text-surface-500">
+          {String(currentIndex + 1).padStart(2, "0")}
+          <span className="text-surface-300"> / {String(total).padStart(2, "0")}</span>
+        </p>
+      </header>
 
-      {/* Progress Bar */}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-100">
+      {/* ── Progress ── */}
+      <div className="h-px w-full bg-surface-100">
         <div
-          className="h-full bg-arcus-500 transition-all duration-300 ease-out"
-          style={{ width: `${((currentIndex + 1) / totalCards) * 100}%` }}
+          className="h-px bg-surface-900 transition-[width] duration-300"
+          style={{ width: `${((currentIndex + 1) / total) * 100}%` }}
         />
       </div>
 
-      {/* Flashcard Area */}
-      <div className="perspective-1000 relative mx-auto mt-12 aspect-[3/2] w-full max-w-2xl cursor-pointer" onClick={handleFlip}>
-        <div
+      {/* ── Card ── */}
+      <div className="flip-scene mx-auto w-full max-w-2xl">
+        <button
+          onClick={() => setIsFlipped((flipped) => !flipped)}
+          aria-label={isFlipped ? "Show the prompt" : "Reveal the answer"}
           className={cn(
-            "preserve-3d absolute h-full w-full transition-transform duration-500 ease-in-out",
-            isFlipped ? "rotate-y-180" : ""
+            "flip-card relative block h-[320px] w-full text-left",
+            isFlipped && "is-flipped"
           )}
         >
           {/* Front */}
-          <div className="backface-hidden absolute flex h-full w-full flex-col items-center justify-center rounded-2xl border border-surface-200 bg-white p-12 text-center shadow-lg">
-            <span className="absolute top-6 right-6 rounded-full bg-arcus-50 px-3 py-1 text-xs font-semibold text-arcus-600">
-              Front
+          <div className="flip-face absolute inset-0 flex flex-col justify-between rounded-lg border border-line bg-surface-0 p-8">
+            <span className="font-mono text-2xs tracking-[0.12em] text-surface-400 uppercase">
+              Prompt
             </span>
-            <h2 className="text-3xl font-medium text-surface-900 leading-tight">
-              {currentCard.front}
-            </h2>
-            <p className="absolute bottom-6 flex items-center gap-2 text-sm text-surface-400">
-              <RefreshCcw className="h-4 w-4" /> Click to flip
-            </p>
+            <p className="text-2xl leading-snug text-surface-900">{card.front}</p>
+            <span className="flex items-center gap-1.5 font-mono text-2xs text-surface-400">
+              <RotateCcw className="h-3 w-3" />
+              Click or press space to reveal
+            </span>
           </div>
 
           {/* Back */}
-          <div className="backface-hidden rotate-y-180 absolute flex h-full w-full flex-col items-center justify-center rounded-2xl border border-arcus-200 bg-arcus-50 p-12 text-center shadow-lg">
-            <span className="absolute top-6 right-6 rounded-full bg-arcus-100 px-3 py-1 text-xs font-semibold text-arcus-700">
-              Back
+          <div className="flip-face flip-face-back absolute inset-0 flex flex-col justify-between overflow-y-auto rounded-lg border border-surface-800 bg-surface-900 p-8">
+            <span className="font-mono text-2xs tracking-[0.12em] text-surface-500 uppercase">
+              Answer
             </span>
-            <p className="text-2xl font-medium text-surface-900 leading-relaxed">
-              {currentCard.back}
-            </p>
+            <p className="text-lg leading-relaxed text-surface-100">{card.back}</p>
+            <span className="font-mono text-2xs text-surface-500">
+              ← → to move between cards
+            </span>
           </div>
-        </div>
+        </button>
       </div>
 
-      {/* Controls */}
-      <div className="mx-auto flex max-w-sm items-center justify-between pt-8">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handlePrev();
-          }}
+      {/* ── Controls ── */}
+      <div className="mx-auto flex max-w-2xl items-center justify-between">
+        <Button
+          onClick={() => go(-1)}
           disabled={currentIndex === 0}
-          className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-surface-600 shadow-sm transition-all hover:bg-surface-50 disabled:opacity-50 disabled:shadow-none"
+          aria-label="Previous card"
         >
-          <ChevronLeft className="h-6 w-6" />
-        </button>
+          <ChevronLeft className="h-3.5 w-3.5" />
+          Previous
+        </Button>
 
-        <button
-          onClick={handleFlip}
-          className="rounded-xl border border-surface-200 bg-white px-8 py-3 font-semibold text-surface-700 shadow-sm hover:bg-surface-50"
-        >
-          Flip Card
-        </button>
+        <Button variant="ghost" onClick={() => setIsFlipped((f) => !f)}>
+          {isFlipped ? "Show prompt" : "Reveal answer"}
+        </Button>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleNext();
-          }}
-          disabled={currentIndex === totalCards - 1}
-          className="flex h-12 w-12 items-center justify-center rounded-xl bg-arcus-600 text-white shadow-md transition-all hover:bg-arcus-700 disabled:opacity-50 disabled:shadow-none"
+        <Button
+          variant="solid"
+          onClick={() => go(1)}
+          disabled={currentIndex === total - 1}
+          aria-label="Next card"
         >
-          <ChevronRight className="h-6 w-6" />
-        </button>
+          Next
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
-      <style jsx global>{`
-        .perspective-1000 {
-          perspective: 1000px;
-        }
-        .preserve-3d {
-          transform-style: preserve-3d;
-        }
-        .backface-hidden {
-          backface-visibility: hidden;
-        }
-        .rotate-y-180 {
-          transform: rotateY(180deg);
-        }
-      `}</style>
+      {/* ── Card index ── */}
+      <Panel className="mx-auto max-w-2xl p-3">
+        <div className="flex flex-wrap gap-1">
+          {deck.cards.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                setIsFlipped(false);
+                setCurrentIndex(index);
+              }}
+              aria-label={`Go to card ${index + 1}`}
+              aria-current={index === currentIndex ? "true" : undefined}
+              className={cn(
+                "h-6 w-6 rounded font-mono text-2xs tabular transition-colors",
+                index === currentIndex
+                  ? "bg-surface-900 text-white"
+                  : "text-surface-400 hover:bg-surface-100 hover:text-surface-700"
+              )}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
+      </Panel>
     </div>
   );
 }

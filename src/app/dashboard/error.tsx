@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, RefreshCcw, Home } from "lucide-react";
-import Link from "next/link";
 import { useEffect } from "react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
+import { Button, ButtonLink, Panel } from "@/components/ui";
 
 export default function DashboardError({
   error,
@@ -12,37 +12,41 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error for debugging
     console.error("Dashboard error:", error);
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-lg py-20 text-center">
-      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50">
-        <AlertTriangle className="h-8 w-8 text-red-500" />
-      </div>
-      <h2 className="mb-2 text-xl font-bold text-surface-900">
-        Something went wrong
-      </h2>
-      <p className="mb-8 text-sm text-surface-500">
-        {error.message || "An unexpected error occurred. Please try again."}
-      </p>
-      <div className="flex items-center justify-center gap-3">
-        <button
-          onClick={reset}
-          className="flex items-center gap-2 rounded-xl bg-arcus-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-arcus-500 hover:shadow-lg"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          Try Again
-        </button>
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 rounded-xl border border-surface-200 bg-white px-5 py-2.5 text-sm font-semibold text-surface-700 transition-all hover:bg-surface-50"
-        >
-          <Home className="h-4 w-4" />
-          Dashboard
-        </Link>
-      </div>
+    <div className="mx-auto max-w-xl py-16">
+      <Panel className="overflow-hidden">
+        <div className="flex items-center gap-2.5 border-b border-red-200 bg-err-soft px-4 py-3">
+          <TriangleAlert className="h-4 w-4 shrink-0 text-err" strokeWidth={1.75} />
+          <h1 className="text-sm font-semibold text-surface-900">
+            This view failed to render
+          </h1>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <p className="text-sm leading-relaxed text-surface-600">
+            {error.message ||
+              "An unexpected error occurred. Retrying often clears it."}
+          </p>
+
+          {/* The digest is what correlates this failure with the server log. */}
+          {error.digest && (
+            <p className="font-mono text-2xs text-surface-400">
+              digest {error.digest}
+            </p>
+          )}
+
+          <div className="flex items-center gap-2 border-t border-line pt-3">
+            <Button variant="solid" onClick={reset}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Try again
+            </Button>
+            <ButtonLink href="/dashboard">Back to overview</ButtonLink>
+          </div>
+        </div>
+      </Panel>
     </div>
   );
 }

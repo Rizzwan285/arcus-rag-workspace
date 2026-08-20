@@ -71,35 +71,120 @@ model VerificationToken {
 // ──────────────────────────────────────────
 
 model Document {
-  id             String          @id @default(cuid())
-  userId         String
-  title          String
-  fileUrl        String
-  fileType       String          @default("pdf")
-  status         DocumentStatus  @default(PENDING)
-  pageCount      Int?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id       String         @id @default(cuid())
+  userId   String
+  title    String
+  fileUrl  String
+  fileType String         @default("pdf")
+  status   DocumentStatus @default(PENDING)
+
+  // ── Ingestion outcome (denormalised from the latest IngestionRun for cheap reads) ──
+  pageCount  Int?
+  chunkCount Int       @default(0)
+  ingestedAt DateTime?
+
+  // ── Dead Letter Queue: populated when ingestion gives up, for user triage ──
+  failedAt     DateTime?
+  failedStep   String?
+  errorMessage String?   @db.Text
+  errorTrace   String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   chunks         DocumentChunk[]
+  ingestionRuns  IngestionRun[]
   flashcardDecks FlashcardDeck[]
   quizzes        Quiz[]
   studyEvents    StudyEvent[]
 
   @@index([userId])
+  // Drives the DLQ triage view (failed documents for one user).
+  @@index([userId, status])
 }
 
 model DocumentChunk {
-  id         String                    @id @default(cuid())
+  id         String @id @default(cuid())
   documentId String
   content    String
+
+  /// SHA-256 (hex) of `content`. Idempotency key: a retried Inngest run
+  /// re-inserts the same chunks and the unique constraint below no-ops them.
+  contentHash String
+
+  /// Approximate token count of `content`, captured at embed time for cost telemetry.
+  tokenCount Int @default(0)
+
   metadata   Json?
   pageNumber Int?
   chunkIndex Int
-  embedding  Unsupported("vector(768)")
-  document   Document                  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  /// Dense retrieval arm. HNSW-indexed (vector_cosine_ops) — see migration
+  /// `20260820_hybrid_search_and_idempotency`; Prisma's schema language has no
+  /// `type: Hnsw`, so that index is declared in raw SQL.
+  embedding Unsupported("vector(768)")
+
+  /// Lexical retrieval arm. A Postgres GENERATED ALWAYS ... STORED column
+  /// (`to_tsvector('english', content)`) — maintained by the database, never
+  /// written by the application.
+  searchVector Unsupported("tsvector")?
+
+  createdAt DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, contentHash])
   @@index([documentId])
+  @@index([searchVector], type: Gin)
+}
+
+/// One row per attempt at ingesting a document. Append-only pipeline telemetry:
+/// latency, chunk yield, dedupe rate, embedding token spend, and the failing step.
+model IngestionRun {
+  id         String @id @default(cuid())
+  documentId String
+
+  /// Inngest run identifier, so a row can be traced back to the run in the dashboard.
+  runId   String?
+  attempt Int                @default(1)
+  status  IngestionRunStatus @default(RUNNING)
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  latencyMs  Int?
+
+  // ── Throughput counters ──
+  bytesFetched   Int?
+  pagesParsed    Int?
+  chunksYielded  Int?
+  chunksRejected Int?
+  chunksInserted Int?
+  chunksDeduped  Int?
+
+  // ── Embedding cost accounting ──
+  embeddingTokens  Int?
+  embeddingCalls   Int?
+  embeddingCostUsd Float?
+
+  /// Per-step wall-clock timings, keyed by Inngest step id.
+  stepTimings Json?
+
+  // ── Failure detail (mirrors what lands on Document for DLQ triage) ──
+  failedStep   String?
+  errorMessage String? @db.Text
+  errorTrace   String? @db.Text
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, startedAt])
+  @@index([status, startedAt])
+}
+
+enum IngestionRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
 }
 
 enum DocumentStatus {
@@ -130,7 +215,7 @@ model ChatMessage {
   sessionId String
   role      MessageRole
   content   String      @db.Text
-  sources   Json?       // References to document chunks used
+  sources   Json? // References to document chunks used
   createdAt DateTime    @default(now())
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -184,13 +269,13 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id            String  @id @default(cuid())
+  id            String   @id @default(cuid())
   quizId        String
-  question      String  @db.Text
+  question      String   @db.Text
   options       String[]
   correctAnswer String
-  explanation   String? @db.Text
-  quiz          Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  explanation   String?  @db.Text
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
 }
 
 // ──────────────────────────────────────────

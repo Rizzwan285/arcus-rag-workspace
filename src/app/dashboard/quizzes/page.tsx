@@ -2,102 +2,115 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { HelpCircle, Layers, Trash2, ArrowRight, FileText, Loader2, Brain } from "lucide-react";
+import { ArrowRight, Brain, FileText, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  Panel,
+  PageHeader,
+  Skeleton,
+} from "@/components/ui";
+import { relativeTime } from "@/lib/utils";
 
 export default function QuizzesPage() {
   const { data: session } = useSession();
 
-  const { data: quizzes = [], isLoading, refetch } = trpc.quiz.getQuizzes.useQuery(undefined, {
-    enabled: !!session?.user,
-  });
+  const {
+    data: quizzes = [],
+    isLoading,
+    refetch,
+  } = trpc.quiz.getQuizzes.useQuery(undefined, { enabled: !!session?.user });
 
   const deleteQuiz = trpc.quiz.deleteQuiz.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => void refetch(),
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div className="animate-fade-in">
-        <h1 className="text-3xl font-bold tracking-tight text-surface-900">
-          Quizzes
-        </h1>
-        <p className="mt-1 text-surface-500">
-          Test your knowledge with AI-generated quizzes
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Study"
+        title="Quizzes"
+        description="Multiple-choice sets drawn from your documents, each answer carrying an explanation."
+        action={
+          <ButtonLink href="/dashboard/documents" variant="outline">
+            Generate from a document
+          </ButtonLink>
+        }
+      />
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-arcus-500" />
-        </div>
+        <Panel className="divide-y divide-line">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="space-y-2 px-4 py-3.5">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+          ))}
+        </Panel>
       ) : quizzes.length === 0 ? (
-        <div className="card animate-fade-in animate-delay-1 p-16 text-center">
-          <Brain className="mx-auto mb-4 h-12 w-12 text-surface-300" />
-          <h3 className="text-lg font-semibold text-surface-900">
-            No Quizzes Yet
-          </h3>
-          <p className="mt-1 text-sm text-surface-500">
-            Generate multiple-choice quizzes from your documents to test yourself.
-          </p>
-          <Link
-            href="/dashboard/documents"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-arcus-600 px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-arcus-700"
-          >
-            Go to Documents
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
+        <EmptyState
+          icon={Brain}
+          title="No quizzes yet"
+          description="Open an indexed document and generate a quiz from its content."
+          action={
+            <ButtonLink href="/dashboard/documents" variant="solid" size="sm">
+              Go to documents
+              <ArrowRight className="h-3.5 w-3.5" />
+            </ButtonLink>
+          }
+        />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz: any, i: number) => (
-            <div
-              key={quiz.id}
-              className={`card group relative flex flex-col overflow-hidden animate-fade-in animate-delay-${Math.min(i + 1, 6)}`}
-            >
-              <div className="p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                    <HelpCircle className="h-5 w-5" />
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (confirm("Delete this quiz?")) {
-                        deleteQuiz.mutate({ id: quiz.id });
-                      }
-                    }}
-                    className="rounded-lg p-2 text-surface-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <h3 className="mb-1 text-lg font-bold text-surface-900 line-clamp-1">
+        <Panel className="divide-y divide-line">
+          {quizzes.map((quiz) => (
+            <div key={quiz.id} className="group flex items-center gap-3 px-4 py-3.5">
+              <Brain
+                className="h-4 w-4 shrink-0 text-surface-300"
+                strokeWidth={1.75}
+              />
+
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/dashboard/quizzes/${quiz.id}`}
+                  className="truncate text-sm font-medium text-surface-900 hover:underline"
+                >
                   {quiz.title}
-                </h3>
-                <div className="flex items-center gap-2 text-xs text-surface-500">
+                </Link>
+                <div className="mt-0.5 flex items-center gap-2 font-mono text-2xs text-surface-400">
+                  <span className="tabular">
+                    {quiz._count.questions} questions
+                  </span>
+                  <span className="text-surface-300">·</span>
                   <FileText className="h-3 w-3" />
-                  <span className="truncate">{quiz.document.title}</span>
+                  <span className="min-w-0 truncate">{quiz.document.title}</span>
+                  <span className="text-surface-300">·</span>
+                  <span>{relativeTime(quiz.createdAt)}</span>
                 </div>
               </div>
-              <div className="mt-auto border-t border-surface-100 bg-surface-50/50 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-surface-600">
-                    <Layers className="h-4 w-4 text-surface-400" />
-                    {quiz._count.questions} questions
-                  </div>
-                  <Link
-                    href={`/dashboard/quizzes/${quiz.id}`}
-                    className="flex items-center gap-1.5 text-sm font-semibold text-purple-600 hover:text-purple-700"
-                  >
-                    Take Quiz
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </div>
+
+              <div className="flex shrink-0 items-center gap-1.5">
+                <ButtonLink href={`/dashboard/quizzes/${quiz.id}`} size="sm">
+                  Start
+                  <ArrowRight className="h-3 w-3" />
+                </ButtonLink>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Delete ${quiz.title}`}
+                  className="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:text-err"
+                  onClick={() => {
+                    if (confirm(`Delete the quiz “${quiz.title}”?`)) {
+                      deleteQuiz.mutate({ id: quiz.id });
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
           ))}
-        </div>
+        </Panel>
       )}
     </div>
   );

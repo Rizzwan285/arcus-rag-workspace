@@ -1,15 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { ArrowLeft, Loader2, CheckCircle2, XCircle, ArrowRight, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button, ButtonLink, EmptyState, Panel, Skeleton } from "@/components/ui";
 
 export default function QuizRunnerPage() {
   const params = useParams();
-  const router = useRouter();
   const quizId = params.id as string;
 
   const { data: quiz, isLoading } = trpc.quiz.getQuizById.useQuery(
@@ -18,227 +24,305 @@ export default function QuizRunnerPage() {
   );
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
 
   if (isLoading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-arcus-500" />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   if (!quiz || quiz.questions.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl text-center py-20">
-        <h2 className="text-2xl font-bold text-surface-900">Quiz not found or empty</h2>
-        <Link href="/dashboard/quizzes" className="mt-4 inline-block text-arcus-600 hover:underline">
-          Return to Quizzes
-        </Link>
-      </div>
+      <EmptyState
+        title="Quiz not found"
+        description="This quiz may have been deleted, or it contains no questions."
+        action={
+          <ButtonLink href="/dashboard/quizzes" size="sm">
+            Back to quizzes
+          </ButtonLink>
+        }
+      />
     );
   }
 
-  const currentQuestion = quiz.questions[currentIndex];
-  const totalQuestions = quiz.questions.length;
-  const isLastQuestion = currentIndex === totalQuestions - 1;
+  const total = quiz.questions.length;
+  const question = quiz.questions[currentIndex];
+  const isLast = currentIndex === total - 1;
+  const answered = Object.keys(answers).length;
 
-  const handleSelectOption = (option: string) => {
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [currentIndex]: option,
-    }));
-  };
-
-  const handleNext = () => {
-    if (isLastQuestion) {
-      setShowResults(true);
-    } else {
-      setCurrentIndex((prev) => prev + 1);
-    }
-  };
-
-  const handleRestart = () => {
+  const restart = () => {
     setCurrentIndex(0);
-    setSelectedAnswers({});
+    setAnswers({});
     setShowResults(false);
   };
 
-  // ── Results View ──
+  /* ── Results ─────────────────────────────────────────────────── */
   if (showResults) {
-    const score = quiz.questions.reduce((acc, q, idx) => {
-      return acc + (selectedAnswers[idx] === q.correctAnswer ? 1 : 0);
-    }, 0);
-    
-    const percentage = Math.round((score / totalQuestions) * 100);
+    const score = quiz.questions.reduce(
+      (acc, q, index) => acc + (answers[index] === q.correctAnswer ? 1 : 0),
+      0
+    );
+    const percentage = Math.round((score / total) * 100);
+    const tone =
+      percentage >= 80 ? "ok" : percentage >= 50 ? "warn" : "err";
 
     return (
-      <div className="mx-auto max-w-3xl space-y-8">
-        <div className="flex items-center gap-4">
+      <div className="space-y-6">
+        <header className="flex items-start gap-3 border-b border-line pb-5">
           <Link
             href="/dashboard/quizzes"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-500 hover:bg-surface-50 hover:text-surface-900"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line text-surface-500 transition-colors hover:bg-surface-50 hover:text-surface-900"
+            aria-label="Back to quizzes"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-2xl font-bold text-surface-900">Quiz Results</h1>
-        </div>
-
-        <div className="flex flex-col items-center justify-center rounded-3xl border border-surface-200 bg-white p-12 text-center shadow-sm">
-          <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border-8 border-surface-100">
-            <svg className="absolute inset-0 h-full w-full -rotate-90">
-              <circle
-                cx="50%"
-                cy="50%"
-                r="45%"
-                className="fill-none stroke-purple-500"
-                strokeWidth="10%"
-                strokeDasharray="283"
-                strokeDashoffset={283 - (283 * percentage) / 100}
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="text-3xl font-bold text-surface-900">{percentage}%</span>
+          <div className="min-w-0">
+            <p className="font-mono text-2xs tracking-[0.12em] text-surface-400 uppercase">
+              Results
+            </p>
+            <h1 className="truncate text-xl text-surface-900">{quiz.title}</h1>
           </div>
-          <h2 className="text-2xl font-bold text-surface-900">
-            {percentage >= 80 ? "Great job!" : percentage >= 50 ? "Good effort!" : "Keep practicing!"}
-          </h2>
-          <p className="mt-2 text-surface-500">
-            You scored {score} out of {totalQuestions} correctly.
-          </p>
-          <button
-            onClick={handleRestart}
-            className="mt-8 flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white shadow-md hover:bg-purple-700"
-          >
-            <RotateCcw className="h-4 w-4" /> Retake Quiz
-          </button>
-        </div>
+        </header>
 
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold text-surface-900">Review Answers</h3>
-          {quiz.questions.map((q, idx) => {
-            const userAnswer = selectedAnswers[idx];
-            const isCorrect = userAnswer === q.correctAnswer;
+        {/* Score */}
+        <Panel className="flex flex-wrap items-center justify-between gap-6 p-6">
+          <div>
+            <p className="font-mono text-2xs tracking-[0.12em] text-surface-400 uppercase">
+              Score
+            </p>
+            <p className="mt-1 flex items-baseline gap-2">
+              <span
+                className={cn(
+                  "font-mono text-5xl tabular",
+                  tone === "ok"
+                    ? "text-ok"
+                    : tone === "warn"
+                      ? "text-warn"
+                      : "text-err"
+                )}
+              >
+                {percentage}
+              </span>
+              <span className="font-mono text-lg text-surface-400">%</span>
+            </p>
+            <p className="mt-1 font-mono text-xs tabular text-surface-500">
+              {score} of {total} correct
+            </p>
+          </div>
 
-            return (
-              <div key={q.id} className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start gap-3">
-                  {isCorrect ? (
-                    <CheckCircle2 className="mt-1 h-5 w-5 flex-shrink-0 text-emerald-500" />
-                  ) : (
-                    <XCircle className="mt-1 h-5 w-5 flex-shrink-0 text-red-500" />
+          {/* Per-question strip: where the misses are, at a glance. */}
+          <div className="flex flex-wrap gap-1">
+            {quiz.questions.map((q, index) => {
+              const correct = answers[index] === q.correctAnswer;
+              return (
+                <span
+                  key={q.id}
+                  title={`Question ${index + 1}: ${correct ? "correct" : "incorrect"}`}
+                  className={cn(
+                    "h-6 w-6 rounded font-mono text-2xs tabular leading-6 text-center",
+                    correct ? "bg-ok-soft text-ok" : "bg-err-soft text-err"
                   )}
-                  <div>
-                    <h4 className="font-semibold text-surface-900">
-                      {idx + 1}. {q.question}
-                    </h4>
-                    <div className="mt-4 space-y-2 text-sm">
-                      <p className="text-surface-600">
-                        <span className="font-medium text-surface-900">Your answer:</span>{" "}
-                        <span className={isCorrect ? "text-emerald-600" : "text-red-600"}>
-                          {userAnswer || "No answer selected"}
-                        </span>
-                      </p>
-                      {!isCorrect && (
-                        <p className="text-surface-600">
-                          <span className="font-medium text-surface-900">Correct answer:</span>{" "}
-                          <span className="text-emerald-600">{q.correctAnswer}</span>
-                        </p>
+                >
+                  {index + 1}
+                </span>
+              );
+            })}
+          </div>
+
+          <Button variant="solid" onClick={restart}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            Retake
+          </Button>
+        </Panel>
+
+        {/* Review */}
+        <section className="space-y-3">
+          <h2 className="font-mono text-2xs tracking-[0.12em] text-surface-400 uppercase">
+            Review
+          </h2>
+          <div className="space-y-3">
+            {quiz.questions.map((q, index) => {
+              const chosen = answers[index];
+              const correct = chosen === q.correctAnswer;
+
+              return (
+                <Panel key={q.id} className="overflow-hidden">
+                  <div className="flex items-start gap-3 border-b border-line px-4 py-3">
+                    <span
+                      className={cn(
+                        "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded",
+                        correct ? "bg-ok-soft text-ok" : "bg-err-soft text-err"
                       )}
-                    </div>
-                    {q.explanation && (
-                      <div className="mt-4 rounded-xl bg-surface-50 p-4 text-sm text-surface-600 border border-surface-100">
-                        <span className="font-semibold text-surface-900">Explanation:</span>{" "}
-                        {q.explanation}
-                      </div>
-                    )}
+                    >
+                      {correct ? (
+                        <Check className="h-3 w-3" strokeWidth={2.5} />
+                      ) : (
+                        <X className="h-3 w-3" strokeWidth={2.5} />
+                      )}
+                    </span>
+                    <p className="min-w-0 flex-1 text-sm font-medium text-surface-900">
+                      <span className="mr-2 font-mono text-2xs text-surface-300">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      {q.question}
+                    </p>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+
+                  <div className="divide-y divide-line">
+                    {q.options.map((option) => {
+                      const isCorrect = option === q.correctAnswer;
+                      const isChosen = option === chosen;
+                      return (
+                        <div
+                          key={option}
+                          className={cn(
+                            "flex items-center gap-2.5 px-4 py-2 text-sm",
+                            isCorrect
+                              ? "bg-ok-soft text-surface-900"
+                              : isChosen
+                                ? "bg-err-soft text-surface-900"
+                                : "text-surface-500"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "font-mono text-2xs",
+                              isCorrect
+                                ? "text-ok"
+                                : isChosen
+                                  ? "text-err"
+                                  : "text-surface-300"
+                            )}
+                          >
+                            {isCorrect ? "✓" : isChosen ? "✕" : "·"}
+                          </span>
+                          <span className="min-w-0 flex-1">{option}</span>
+                          {isChosen && (
+                            <span className="shrink-0 font-mono text-2xs text-surface-400">
+                              your answer
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {q.explanation && (
+                    <p className="border-t border-line bg-surface-50 px-4 py-2.5 text-xs leading-relaxed text-surface-600">
+                      {q.explanation}
+                    </p>
+                  )}
+                </Panel>
+              );
+            })}
+          </div>
+        </section>
       </div>
     );
   }
 
-  // ── Quiz Runner View ──
+  /* ── Question ────────────────────────────────────────────────── */
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+        <div className="flex min-w-0 items-start gap-3">
           <Link
             href="/dashboard/quizzes"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-500 hover:bg-surface-50 hover:text-surface-900"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line text-surface-500 transition-colors hover:bg-surface-50 hover:text-surface-900"
+            aria-label="Back to quizzes"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-surface-900 line-clamp-1">{quiz.title}</h1>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl text-surface-900">{quiz.title}</h1>
+            <p className="mt-0.5 truncate font-mono text-2xs text-surface-400">
+              {quiz.document.title}
+            </p>
           </div>
         </div>
-        <div className="text-sm font-medium text-surface-500">
-          Question {currentIndex + 1} of {totalQuestions}
-        </div>
-      </div>
+        <p className="font-mono text-sm tabular text-surface-500">
+          {String(currentIndex + 1).padStart(2, "0")}
+          <span className="text-surface-300"> / {String(total).padStart(2, "0")}</span>
+        </p>
+      </header>
 
-      {/* Progress Bar */}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-100">
+      <div className="h-px w-full bg-surface-100">
         <div
-          className="h-full bg-purple-500 transition-all duration-300 ease-out"
-          style={{ width: `${((currentIndex + 1) / totalQuestions) * 100}%` }}
+          className="h-px bg-surface-900 transition-[width] duration-300"
+          style={{ width: `${(answered / total) * 100}%` }}
         />
       </div>
 
-      {/* Question Card */}
-      <div className="rounded-3xl border border-surface-200 bg-white p-8 shadow-sm">
-        <h2 className="mb-8 text-xl font-medium text-surface-900 leading-relaxed">
-          {currentQuestion.question}
-        </h2>
-        
-        <div className="space-y-3">
-          {currentQuestion.options.map((option, idx) => {
-            const isSelected = selectedAnswers[currentIndex] === option;
+      <Panel className="overflow-hidden">
+        <div className="border-b border-line px-5 py-4">
+          <p className="text-lg leading-snug text-surface-900">
+            {question.question}
+          </p>
+        </div>
+
+        <div className="divide-y divide-line">
+          {question.options.map((option, index) => {
+            const selected = answers[currentIndex] === option;
             return (
               <button
-                key={idx}
-                onClick={() => handleSelectOption(option)}
+                key={option}
+                onClick={() =>
+                  setAnswers((prev) => ({ ...prev, [currentIndex]: option }))
+                }
+                aria-pressed={selected}
                 className={cn(
-                  "flex w-full items-center gap-4 rounded-xl border p-4 text-left transition-all",
-                  isSelected
-                    ? "border-purple-500 bg-purple-50 text-purple-900 ring-1 ring-purple-500 shadow-sm"
-                    : "border-surface-200 bg-white text-surface-700 hover:border-purple-200 hover:bg-purple-50/30"
+                  "flex w-full items-center gap-3 px-5 py-3 text-left text-sm transition-colors",
+                  selected
+                    ? "bg-surface-900 text-white"
+                    : "text-surface-700 hover:bg-surface-50"
                 )}
               >
-                <div
+                <span
                   className={cn(
-                    "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-                    isSelected
-                      ? "border-purple-500 bg-purple-500 text-white"
-                      : "border-surface-300 text-surface-500"
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-2xs",
+                    selected
+                      ? "bg-white/15 text-white"
+                      : "bg-surface-100 text-surface-500"
                   )}
                 >
-                  {String.fromCharCode(65 + idx)}
-                </div>
-                <span>{option}</span>
+                  {String.fromCharCode(65 + index)}
+                </span>
+                <span className="min-w-0 flex-1">{option}</span>
               </button>
             );
           })}
         </div>
-      </div>
+      </Panel>
 
-      {/* Footer Controls */}
-      <div className="flex justify-end pt-4">
-        <button
-          onClick={handleNext}
-          disabled={!selectedAnswers[currentIndex]}
-          className="flex items-center gap-2 rounded-xl bg-purple-600 px-8 py-3 font-semibold text-white shadow-md transition-all hover:bg-purple-700 disabled:opacity-50 disabled:shadow-none"
+      <div className="flex items-center justify-between">
+        <Button
+          onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+          disabled={currentIndex === 0}
         >
-          {isLastQuestion ? "Finish Quiz" : "Next Question"}
-          {!isLastQuestion && <ArrowRight className="h-4 w-4" />}
-        </button>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Previous
+        </Button>
+
+        <p className="font-mono text-2xs tabular text-surface-400">
+          {answered} of {total} answered
+        </p>
+
+        <Button
+          variant="solid"
+          disabled={!answers[currentIndex]}
+          onClick={() => {
+            if (isLast) setShowResults(true);
+            else setCurrentIndex((i) => i + 1);
+          }}
+        >
+          {isLast ? "See results" : "Next"}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </div>
   );
