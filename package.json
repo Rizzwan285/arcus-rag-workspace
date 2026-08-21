@@ -10,7 +10,10 @@
     "db:migrate": "prisma migrate deploy && npm run db:verify",
     "db:verify": "node scripts/db-objects.mjs verify",
     "db:repair": "node scripts/db-objects.mjs repair",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:build": "tsc -p tsconfig.eval.json",
+    "test": "npm run eval:build && node --test .eval-build/",
+    "eval": "npm run eval:build && node .eval-build/eval/run-benchmark.js"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.108",

@@ -23,45 +23,27 @@
  * single arm ranks first — which is exactly the behaviour that makes hybrid
  * beat either arm alone.
  *
- * @see ADR-015 in .claude/decisions.md
+ * The SQL itself lives in `./query.ts` so the evaluation harness can execute the
+ * identical statement over its own connection.
+ *
+ * @see ADR-015, ADR-020 in .claude/decisions.md
  */
 
 import { prisma } from "@/server/db/prisma";
 import { embedQuery } from "@/lib/langchain/embeddings";
+import {
+  buildHybridSearchParams,
+  DEFAULT_CANDIDATE_POOL,
+  DEFAULT_EF_SEARCH,
+  DEFAULT_RRF_K,
+  HYBRID_SEARCH_SQL,
+  toRetrievedChunk,
+  type FusedRow,
+  type RetrievalMode,
+  type RetrievedChunk,
+} from "./query";
 
-/** Standard RRF damping constant. */
-const DEFAULT_RRF_K = 60;
-
-/** Rows pulled from each arm before fusion. Over-fetching is what gives RRF something to fuse. */
-const DEFAULT_CANDIDATE_POOL = 40;
-
-/**
- * HNSW search-list size. Higher = better recall, more work. 100 is a sane
- * default for a corpus of this size; pgvector's default of 40 under-recalls
- * once a per-user filter is applied.
- */
-const DEFAULT_EF_SEARCH = 100;
-
-export interface RetrievedChunk {
-  id: string;
-  documentId: string;
-  content: string;
-  metadata: Record<string, unknown> | null;
-  pageNumber: number | null;
-  chunkIndex: number;
-  /** Cosine similarity (0–1). 0 when the chunk was found only by the lexical arm. */
-  similarity: number;
-  /** `ts_rank_cd` score. 0 when the chunk was found only by the dense arm. */
-  keywordScore: number;
-  /** 1-based rank within the dense arm, or null if it did not appear. */
-  vectorRank: number | null;
-  /** 1-based rank within the lexical arm, or null if it did not appear. */
-  keywordRank: number | null;
-  /** Fused RRF score — the ordering key. */
-  rrfScore: number;
-  /** Which arm(s) surfaced this chunk. Useful for evaluating retrieval quality. */
-  matchedBy: "both" | "vector" | "keyword";
-}
+export type { RetrievedChunk, RetrievalMode };
 
 export interface HybridSearchOptions {
   /** Rows returned after fusion. */
@@ -80,6 +62,10 @@ export interface HybridSearchOptions {
   documentId?: string;
   /** Override HNSW `ef_search` for this query. */
   efSearch?: number;
+  /** Ablate an arm. Defaults to `"hybrid"` — both arms. */
+  mode?: RetrievalMode;
+  /** Reuse an embedding instead of calling the embedding API. */
+  queryEmbedding?: number[];
 }
 
 /** Telemetry returned alongside results, so retrieval quality is observable. */
@@ -99,107 +85,6 @@ export interface HybridSearchResponse {
   chunks: RetrievedChunk[];
   telemetry: HybridSearchTelemetry;
 }
-
-/** Shape returned by the raw SQL below. */
-interface FusedRow {
-  id: string;
-  documentId: string;
-  content: string;
-  metadata: Record<string, unknown> | null;
-  pageNumber: number | null;
-  chunkIndex: number;
-  similarity: number;
-  keywordScore: number;
-  vectorRank: number | null;
-  keywordRank: number | null;
-  rrfScore: number;
-}
-
-/** pgvector's literal format: `[0.1,0.2,...]`. */
-function toVectorLiteral(embedding: number[]): string {
-  return `[${embedding.join(",")}]`;
-}
-
-/**
- * The fusion query.
- *
- * Both arms filter by owner and completion status *inside* their own CTE and
- * apply their own LIMIT, so each stays index-driven and neither has to rank the
- * full corpus. The FULL OUTER JOIN is what lets a chunk found by only one arm
- * still compete — it simply scores from that arm alone.
- */
-const HYBRID_SEARCH_SQL = /* sql */ `
-WITH vector_arm AS (
-  SELECT
-    v.id,
-    v.similarity,
-    (ROW_NUMBER() OVER (ORDER BY v.distance ASC))::int AS rank
-  FROM (
-    SELECT
-      dc.id,
-      dc.embedding <=> $1::vector              AS distance,
-      1 - (dc.embedding <=> $1::vector)        AS similarity
-    FROM "DocumentChunk" dc
-    INNER JOIN "Document" d ON d.id = dc."documentId"
-    WHERE d."userId" = $2
-      AND d.status = 'COMPLETED'
-      AND ($3::text IS NULL OR dc."documentId" = $3::text)
-    ORDER BY dc.embedding <=> $1::vector
-    LIMIT $4::int
-  ) v
-  WHERE v.similarity >= $5::float8
-),
-keyword_arm AS (
-  SELECT
-    k.id,
-    k.score,
-    (ROW_NUMBER() OVER (ORDER BY k.score DESC, k.id ASC))::int AS rank
-  FROM (
-    SELECT
-      dc.id,
-      ts_rank_cd(dc."searchVector", q.query) AS score
-    FROM "DocumentChunk" dc
-    INNER JOIN "Document" d ON d.id = dc."documentId"
-    CROSS JOIN websearch_to_tsquery('english', $6::text) AS q(query)
-    WHERE d."userId" = $2
-      AND d.status = 'COMPLETED'
-      AND ($3::text IS NULL OR dc."documentId" = $3::text)
-      AND dc."searchVector" @@ q.query
-    ORDER BY score DESC
-    LIMIT $4::int
-  ) k
-),
-fused AS (
-  SELECT
-    COALESCE(v.id, k.id)                                        AS id,
-    v.rank                                                      AS vector_rank,
-    k.rank                                                      AS keyword_rank,
-    COALESCE(v.similarity, 0)::float8                           AS similarity,
-    COALESCE(k.score, 0)::float8                                AS keyword_score,
-    (
-      COALESCE($7::float8 / ($8::float8 + v.rank), 0) +
-      COALESCE($9::float8 / ($8::float8 + k.rank), 0)
-    )::float8                                                   AS rrf_score
-  FROM vector_arm v
-  FULL OUTER JOIN keyword_arm k ON k.id = v.id
-)
-SELECT
-  dc.id,
-  dc."documentId"      AS "documentId",
-  dc.content,
-  dc.metadata,
-  dc."pageNumber"      AS "pageNumber",
-  dc."chunkIndex"      AS "chunkIndex",
-  f.similarity         AS "similarity",
-  f.keyword_score      AS "keywordScore",
-  f.vector_rank        AS "vectorRank",
-  f.keyword_rank       AS "keywordRank",
-  f.rrf_score          AS "rrfScore"
-FROM fused f
-INNER JOIN "DocumentChunk" dc ON dc.id = f.id
-ORDER BY f.rrf_score DESC, f.similarity DESC
-LIMIT $10::int
-`;
 
 /**
  * Run hybrid retrieval for one user.
@@ -221,6 +106,8 @@ export async function hybridSearch(
     minSimilarity = 0,
     documentId,
     efSearch = DEFAULT_EF_SEARCH,
+    mode = "hybrid",
+    queryEmbedding: providedEmbedding,
   } = options;
 
   const startedAt = Date.now();
@@ -228,21 +115,22 @@ export async function hybridSearch(
   // The query is embedded with RETRIEVAL_QUERY; the corpus used
   // RETRIEVAL_DOCUMENT. Gemini optimises each side of that pair separately.
   const embedStartedAt = Date.now();
-  const queryEmbedding = await embedQuery(query);
+  const queryEmbedding = providedEmbedding ?? (await embedQuery(query));
   const embedMs = Date.now() - embedStartedAt;
 
-  const params = [
-    toVectorLiteral(queryEmbedding), // $1  query vector
-    userId, // $2  owner
-    documentId ?? null, // $3  optional document scope
-    Math.max(candidatePool, limit), // $4  per-arm candidate pool
-    minSimilarity, // $5  dense-arm floor
-    query, // $6  raw text for websearch_to_tsquery
-    vectorWeight, // $7
-    rrfK, // $8
-    keywordWeight, // $9
-    limit, // $10
-  ];
+  const params = buildHybridSearchParams({
+    queryEmbedding,
+    queryText: query,
+    userId,
+    limit,
+    candidatePool,
+    rrfK,
+    vectorWeight,
+    keywordWeight,
+    minSimilarity,
+    documentId,
+    mode,
+  });
 
   const queryStartedAt = Date.now();
   let degraded = false;
@@ -266,20 +154,7 @@ export async function hybridSearch(
   }
   const queryMs = Date.now() - queryStartedAt;
 
-  const chunks: RetrievedChunk[] = rows.map((row) => ({
-    ...row,
-    similarity: Number(row.similarity),
-    keywordScore: Number(row.keywordScore),
-    rrfScore: Number(row.rrfScore),
-    vectorRank: row.vectorRank === null ? null : Number(row.vectorRank),
-    keywordRank: row.keywordRank === null ? null : Number(row.keywordRank),
-    matchedBy:
-      row.vectorRank !== null && row.keywordRank !== null
-        ? "both"
-        : row.vectorRank !== null
-          ? "vector"
-          : "keyword",
-  }));
+  const chunks = rows.map(toRetrievedChunk);
 
   return {
     chunks,

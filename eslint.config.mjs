@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Compiled output of tsconfig.eval.json — the TypeScript sources under
+    // eval/ and src/ are linted instead.
+    ".eval-build/**",
   ]),
 ]);
 

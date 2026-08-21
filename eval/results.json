@@ -1,0 +1,332 @@
+{
+  "overall": {
+    "vector": {
+      "queries": 30,
+      "recallAt1": 0.8333333333333334,
+      "recallAt5": 1,
+      "recallAt10": 1,
+      "hitAt1": 0.9333333333333333,
+      "hitAt5": 1,
+      "hitAt10": 1,
+      "mrr": 0.9666666666666667,
+      "ndcgAt10": 0.9753953169047639
+    },
+    "keyword": {
+      "queries": 30,
+      "recallAt1": 0.6166666666666667,
+      "recallAt5": 0.8333333333333334,
+      "recallAt10": 0.8666666666666667,
+      "hitAt1": 0.7,
+      "hitAt5": 0.8333333333333334,
+      "hitAt10": 0.8666666666666667,
+      "mrr": 0.7475396825396825,
+      "ndcgAt10": 0.7755329569744445
+    },
+    "hybrid": {
+      "queries": 30,
+      "recallAt1": 0.7666666666666667,
+      "recallAt5": 0.9333333333333333,
+      "recallAt10": 0.9666666666666667,
+      "hitAt1": 0.8666666666666667,
+      "hitAt5": 0.9333333333333333,
+      "hitAt10": 0.9666666666666667,
+      "mrr": 0.895,
+      "ndcgAt10": 0.9116890379320913
+    }
+  },
+  "byCategory": {
+    "paraphrase": {
+      "vector": {
+        "queries": 10,
+        "recallAt1": 0.8,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 0.8,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 0.9,
+        "ndcgAt10": 0.9261859507142916
+      },
+      "keyword": {
+        "queries": 10,
+        "recallAt1": 0.2,
+        "recallAt5": 0.6,
+        "recallAt10": 0.6,
+        "hitAt1": 0.2,
+        "hitAt5": 0.6,
+        "hitAt10": 0.6,
+        "mrr": 0.3283333333333333,
+        "ndcgAt10": 0.3948459118879392
+      },
+      "hybrid": {
+        "queries": 10,
+        "recallAt1": 0.6,
+        "recallAt5": 0.8,
+        "recallAt10": 0.9,
+        "hitAt1": 0.6,
+        "hitAt5": 0.8,
+        "hitAt10": 0.9,
+        "mrr": 0.6849999999999999,
+        "ndcgAt10": 0.7350671137962739
+      }
+    },
+    "exact-term": {
+      "vector": {
+        "queries": 10,
+        "recallAt1": 1,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 1,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 1,
+        "ndcgAt10": 1
+      },
+      "keyword": {
+        "queries": 10,
+        "recallAt1": 1,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 1,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 1,
+        "ndcgAt10": 1
+      },
+      "hybrid": {
+        "queries": 10,
+        "recallAt1": 1,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 1,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 1,
+        "ndcgAt10": 1
+      }
+    },
+    "mixed": {
+      "vector": {
+        "queries": 10,
+        "recallAt1": 0.7,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 1,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 1,
+        "ndcgAt10": 1
+      },
+      "keyword": {
+        "queries": 10,
+        "recallAt1": 0.65,
+        "recallAt5": 0.9,
+        "recallAt10": 1,
+        "hitAt1": 0.9,
+        "hitAt5": 0.9,
+        "hitAt10": 1,
+        "mrr": 0.9142857142857143,
+        "ndcgAt10": 0.9317529590353946
+      },
+      "hybrid": {
+        "queries": 10,
+        "recallAt1": 0.7,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 1,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 1,
+        "ndcgAt10": 1
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "label": "Hybrid − Vector",
+      "metric": "MRR",
+      "result": {
+        "meanDelta": -0.07166666666666667,
+        "ci95": [
+          -0.15833333333333333,
+          -0.008333333333333333
+        ],
+        "wins": 0,
+        "losses": 4,
+        "ties": 26,
+        "significant": true
+      }
+    },
+    {
+      "label": "Hybrid − Vector",
+      "metric": "Recall@10",
+      "result": {
+        "meanDelta": -0.03333333333333333,
+        "ci95": [
+          -0.1,
+          0
+        ],
+        "wins": 0,
+        "losses": 1,
+        "ties": 29,
+        "significant": false
+      }
+    },
+    {
+      "label": "Hybrid − Lexical",
+      "metric": "MRR",
+      "result": {
+        "meanDelta": 0.14746031746031746,
+        "ci95": [
+          0.05690476190476191,
+          0.25214285714285717
+        ],
+        "wins": 8,
+        "losses": 0,
+        "ties": 22,
+        "significant": true
+      }
+    },
+    {
+      "label": "Hybrid − Lexical",
+      "metric": "Recall@10",
+      "result": {
+        "meanDelta": 0.1,
+        "ci95": [
+          0,
+          0.2
+        ],
+        "wins": 3,
+        "losses": 0,
+        "ties": 27,
+        "significant": false
+      }
+    },
+    {
+      "label": "Hybrid − Vector",
+      "metric": "nDCG@10",
+      "result": {
+        "meanDelta": -0.06370627897267254,
+        "ci95": [
+          -0.14668354636653763,
+          -0.006675106516602149
+        ],
+        "wins": 0,
+        "losses": 4,
+        "ties": 26,
+        "significant": true
+      }
+    }
+  ],
+  "latencyMs": {
+    "vector": {
+      "median": 640,
+      "p95": 676
+    },
+    "keyword": {
+      "median": 640,
+      "p95": 659
+    },
+    "hybrid": {
+      "median": 642,
+      "p95": 656
+    }
+  },
+  "meta": {
+    "ranAt": "2026-08-20 19:52 UTC",
+    "corpusSize": 103,
+    "queryCount": 30,
+    "limit": 10,
+    "rrfK": 60,
+    "candidatePool": 40,
+    "embeddingModel": "gemini-embedding-001",
+    "apiCalls": 0,
+    "cacheHits": 133
+  },
+  "sweep": [
+    {
+      "keywordWeight": 0,
+      "scores": {
+        "queries": 30,
+        "recallAt1": 0.8333333333333334,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 0.9333333333333333,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 0.9666666666666667,
+        "ndcgAt10": 0.9753953169047639
+      }
+    },
+    {
+      "keywordWeight": 0.1,
+      "scores": {
+        "queries": 30,
+        "recallAt1": 0.8,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "hitAt1": 0.9,
+        "hitAt5": 1,
+        "hitAt10": 1,
+        "mrr": 0.9388888888888888,
+        "ndcgAt10": 0.9543643251190486
+      }
+    },
+    {
+      "keywordWeight": 0.25,
+      "scores": {
+        "queries": 30,
+        "recallAt1": 0.8,
+        "recallAt5": 0.9333333333333333,
+        "recallAt10": 1,
+        "hitAt1": 0.9,
+        "hitAt5": 0.9333333333333333,
+        "hitAt10": 1,
+        "mrr": 0.9263888888888889,
+        "ndcgAt10": 0.9434200605821736
+      }
+    },
+    {
+      "keywordWeight": 0.5,
+      "scores": {
+        "queries": 30,
+        "recallAt1": 0.8,
+        "recallAt5": 0.9333333333333333,
+        "recallAt10": 0.9666666666666667,
+        "hitAt1": 0.9,
+        "hitAt5": 0.9333333333333333,
+        "hitAt10": 0.9666666666666667,
+        "mrr": 0.92,
+        "ndcgAt10": 0.9306664859963115
+      }
+    },
+    {
+      "keywordWeight": 0.75,
+      "scores": {
+        "queries": 30,
+        "recallAt1": 0.7666666666666667,
+        "recallAt5": 0.9333333333333333,
+        "recallAt10": 0.9666666666666667,
+        "hitAt1": 0.8666666666666667,
+        "hitAt5": 0.9333333333333333,
+        "hitAt10": 0.9666666666666667,
+        "mrr": 0.8977777777777778,
+        "ndcgAt10": 0.9139998193296448
+      }
+    },
+    {
+      "keywordWeight": 1,
+      "scores": {
+        "queries": 30,
+        "recallAt1": 0.7666666666666667,
+        "recallAt5": 0.9333333333333333,
+        "recallAt10": 0.9666666666666667,
+        "hitAt1": 0.8666666666666667,
+        "hitAt5": 0.9333333333333333,
+        "hitAt10": 0.9666666666666667,
+        "mrr": 0.895,
+        "ndcgAt10": 0.9116890379320913
+      }
+    }
+  ]
+}

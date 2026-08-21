@@ -1,0 +1,34 @@
+{
+  // Emit-mode config for the evaluation harness and unit tests.
+  //
+  // The project has no test runner or TS loader as dependencies, and Node 20
+  // cannot execute TypeScript directly. Rather than add tooling, this config
+  // compiles the pure modules to CommonJS in `.eval-build/`, which plain
+  // `node --test` and `node` can then run. CommonJS is deliberate: it resolves
+  // TypeScript's extensionless relative imports without a loader hook.
+  //
+  // Only dependency-free modules are compiled — nothing here imports the Prisma
+  // client, React, or Next.js.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": ".",
+    "outDir": ".eval-build",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": false,
+    "incremental": false,
+    "types": ["node"]
+  },
+  "include": [
+    "eval/**/*.ts",
+    "src/lib/retrieval/query.ts",
+    "src/lib/retrieval/metrics.ts",
+    "src/lib/retrieval/query.test.ts",
+    "src/lib/retrieval/metrics.test.ts"
+  ]
+}

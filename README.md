@@ -36,12 +36,40 @@ Both arms filter by owner *inside* their own CTE and carry their own `LIMIT`, so
 each stays index-driven rather than ranking the full corpus. The whole thing is
 one raw SQL statement — see [`src/lib/retrieval/hybrid-search.ts`](src/lib/retrieval/hybrid-search.ts).
 
-**Observed on production data**: 130–170 ms end to end. `EXPLAIN ANALYZE`
-confirms `Index Scan using DocumentChunk_embedding_hnsw_idx` and
-`Bitmap Index Scan on DocumentChunk_searchVector_idx`. For the query
-*"Data Science and Engineering curriculum"*, the chunk ranked **#5** by the dense
-arm and **#1** by the lexical arm fused to overall **#2** — ahead of three chunks
-the dense arm ranked higher. That reordering is the whole point of hybrid.
+**Measured, not assumed.** `eval/` holds a 103-passage labelled corpus and 30
+queries; `npm run eval` scores all three configurations through the *same* SQL
+statement, with paired-bootstrap confidence intervals. See
+**[eval/RESULTS.md](eval/RESULTS.md)**.
+
+The honest result on that corpus: **fusion does not beat the dense arm alone.**
+
+| System | R@1 | R@5 | R@10 | MRR | nDCG@10 |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Vector only | 83.3 | 100.0 | 100.0 | **0.967** | **0.975** |
+| Lexical only | 61.7 | 83.3 | 86.7 | 0.748 | 0.776 |
+| Hybrid (RRF) | 76.7 | 93.3 | 96.7 | 0.895 | 0.912 |
+
+Hybrid loses 0.072 MRR to pure dense retrieval (95% CI [−0.158, −0.008]), and a
+keyword-weight sweep degrades monotonically. The dense arm answered *every*
+exact-term query at rank 1, which falsifies the premise that a lexical arm is
+needed for course codes and named theorems.
+
+The defaults were left unchanged anyway: tuning them on 30 synthetic queries is
+fitting the evaluation set, and the fixture is clean English text while the real
+corpus is a PDF with a partly mangled text layer — the one case where exact
+string matching may be all that works. Reasoning in **ADR-022**.
+
+Building the harness also exposed a live bug: the lexical arm used
+`websearch_to_tsquery`, which joins terms with **AND**, so
+*"what is the minimum CGPA required to graduate"* became
+`'minimum' & 'cgpa' & 'requir' & 'graduat'` and matched nothing — the passage
+states the rule without using the word "graduate". The arm was returning zero
+rows for essentially every natural-language question. Switching to a disjunctive
+tsquery took it from 36.7% to 61.7% Recall@1 (**ADR-021**).
+
+Performance on the production corpus: 130–170 ms end to end, with
+`EXPLAIN ANALYZE` confirming `Index Scan using DocumentChunk_embedding_hnsw_idx`
+and `Bitmap Index Scan on DocumentChunk_searchVector_idx`.
 
 The retriever also sets `hnsw.ef_search` and `hnsw.iterative_scan` per query via
 `SET LOCAL`, so a per-user filter can't silently shrink an HNSW result set below
@@ -213,6 +241,9 @@ So after running `npx prisma migrate dev`:
 | `npm run db:verify` | Assert HNSW, GIN, generated column, and unique index exist |
 | `npm run db:repair` | Idempotently replay the objects Prisma can't model |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Unit tests (metrics, query builder, dataset integrity) |
+| `npm run eval` | Retrieval benchmark → `eval/RESULTS.md` |
+| `npm run eval -- --sweep` | Benchmark plus the keyword-weight sweep |
 | `node scripts/list-models.mjs` | List Gemini models this API key can reach |
 
 ---
@@ -222,5 +253,8 @@ So after running `npx prisma migrate dev`:
 Every non-obvious choice is recorded with its rationale and the alternatives
 considered in [`.claude/decisions.md`](.claude/decisions.md) — including why RRF
 over weighted score blending (ADR-015), why the content hash is the idempotency
-key (ADR-016), why telemetry lives in a table rather than logs (ADR-017), and why
-`FAILED` is set on exhausted retries rather than first failure (ADR-018).
+key (ADR-016), why telemetry lives in a table rather than logs (ADR-017), why
+`FAILED` is set on exhausted retries rather than first failure (ADR-018), how the
+evaluation harness is constructed (ADR-020), why the lexical arm needs a
+disjunctive tsquery (ADR-021), and why the fusion weights were **left alone**
+despite the benchmark suggesting a change (ADR-022).
